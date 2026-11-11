@@ -18,6 +18,7 @@ export type FurnitureKind =
   | 'diningChair'
   | 'pendant'
   | 'plant'
+  | 'floorLamp'
   | 'fridge'
   | 'kitchenCounter'
   | 'bathtub'
@@ -102,7 +103,7 @@ export const furniture: Furniture[] = [
   item('sofa', 'ld', [5.45, 9.1], WEST, [1.8, 0.9, 0.66]),
   item('coffeeTable', 'ld', [4.3, 9.1], EAST, [1.0, 0.5, 0.32]),
   item('catFood', 'ld', [5.76, 7.85], WEST, [0.5, 0.3, 0.1]),
-  item('plant', 'ld', [5.55, 10.5], SOUTH, [0.5, 0.5, 1.75]),
+  item('floorLamp', 'ld', [5.6, 10.45], SOUTH, [0.34, 0.34, 1.5]),
 
   // 洋室(2): hobby and work room
   item('workDesk', 'workroom', [0.48, 9.4], EAST, [1.6, 0.75, 0.72]),

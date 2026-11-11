@@ -6,7 +6,7 @@ import { Bed, BedsideTable, ClothesRack, Rug } from './bedroom'
 import { CatFood, CatLitter, CatTower } from './cat'
 import { StudyDesk, WorkDesk } from './desks'
 import { Fridge, KitchenCounter } from './kitchen'
-import { CoffeeTable, DiningTable, Downlight, Pendant, Plant } from './living'
+import { CoffeeTable, DiningTable, Downlight, FloorLamp, Pendant, Plant } from './living'
 import { DiningChair, Sofa, WorkChair } from './seating'
 import { Bookshelf, Closet, DisplayShelf, ShoeCabinet, Sideboard } from './storage'
 import type { PieceProps } from './types'
@@ -30,6 +30,7 @@ const pieces: Record<FurnitureKind, ComponentType<PieceProps>> = {
   diningChair: DiningChair,
   pendant: Pendant,
   plant: Plant,
+  floorLamp: FloorLamp,
   fridge: Fridge,
   kitchenCounter: KitchenCounter,
   bathtub: Bathtub,
