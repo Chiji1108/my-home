@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { type Viewpoint, viewpoints } from './plan/viewpoints'
 import { CameraRig } from './scene/CameraRig'
 import { FurnitureLayer } from './scene/furniture'
-import { IndirectLights } from './scene/IndirectLights'
 import { Lighting } from './scene/Lighting'
 import { SceneStateProvider } from './scene/SceneState'
 import { Shell } from './scene/Shell'
@@ -15,7 +14,6 @@ export function App() {
   const [shot, setShot] = useState<{ view: Viewpoint }>({ view: viewpoints[0] })
   const [night, setNight] = useState(false)
   const [wallOpen, setWallOpen] = useState(false)
-  const [indirect, setIndirect] = useState(true)
   const { view } = shot
 
   return (
@@ -26,11 +24,10 @@ export function App() {
         gl={{ antialias: false }}
         camera={{ fov: 60, near: 0.05, far: 120 }}
       >
-        <SceneStateProvider value={{ night, wallOpen, indirect: night && indirect }}>
+        <SceneStateProvider value={{ night, wallOpen }}>
           <Shell />
           <FurnitureLayer />
           <Lighting />
-          <IndirectLights />
         </SceneStateProvider>
         <CameraRig shot={shot} />
       </Canvas>
@@ -41,8 +38,6 @@ export function App() {
         onNight={setNight}
         wallOpen={wallOpen}
         onWallOpen={setWallOpen}
-        indirect={indirect}
-        onIndirect={setIndirect}
       />
     </>
   )

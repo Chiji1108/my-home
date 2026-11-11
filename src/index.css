@@ -105,14 +105,6 @@ canvas {
   outline-offset: 1px;
 }
 
-.toggle:disabled {
-  opacity: 0.45;
-}
-
-.toggle:disabled span {
-  cursor: default;
-}
-
 .toggle legend {
   float: left;
   padding: 0 6px 0 11px;

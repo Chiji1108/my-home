@@ -61,8 +61,7 @@ const diningChair = (side: -1 | 1) =>
 
 export const furniture: Furniture[] = [
   // 洋室(1): bedroom
-  // Stands off the wall to leave a gap for the strip behind the headboard.
-  item('bed', 'bedroom', [1.21, 1.95], EAST, [1.6, 2.04, 0.85]),
+  item('bed', 'bedroom', [1.12, 1.95], EAST, [1.6, 2.04, 0.85]),
   item('bedsideTable', 'bedroom', [0.31, 0.95], EAST, [0.36, 0.4, 0.45]),
   item('bedsideTable', 'bedroom', [0.31, 2.97], EAST, [0.36, 0.4, 0.45]),
   item('clothesRack', 'wicNorth', [0.87, 4.3], NORTH, [1.5, 0.38, 1.8]),
@@ -100,8 +99,7 @@ export const furniture: Furniture[] = [
   diningChair(1),
   item('pendant', 'ld', dining, SOUTH, [0.6, 0.6, 0.42]),
   item('rug', 'ld', [4.3, 9.1], SOUTH, [1.4, 2.0, 0.012]),
-  // Stands off the wall to leave a gap for the strip on its back.
-  item('sofa', 'ld', [5.33, 9.1], WEST, [1.8, 0.9, 0.66]),
+  item('sofa', 'ld', [5.45, 9.1], WEST, [1.8, 0.9, 0.66]),
   item('coffeeTable', 'ld', [4.3, 9.1], EAST, [1.0, 0.5, 0.32]),
   item('catFood', 'ld', [5.76, 7.85], WEST, [0.5, 0.3, 0.1]),
   item('plant', 'ld', [5.55, 10.5], SOUTH, [0.5, 0.5, 1.75]),

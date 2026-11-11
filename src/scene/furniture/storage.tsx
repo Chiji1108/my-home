@@ -94,18 +94,14 @@ export function DisplayShelf({ size }: PieceProps) {
   )
 }
 
-// A closed cabinet with a pair of doors on the front (+z). `plinth` is the
-// height of a recessed base under the doors.
-function Cabinet({ size: [w, d, h], doors, plinth = 0 }: PieceProps & { doors: Material; plinth?: number }) {
-  const body = h - plinth
-  const mid = plinth + body / 2
+// A closed cabinet with a pair of doors on the front (+z).
+function Cabinet({ size: [w, d, h], doors }: PieceProps & { doors: Material }) {
   return (
     <group>
-      <Block size={[w, body, d - 0.02]} position={[0, mid, -0.01]} material={materials.panel} />
-      {plinth > 0 && <Block size={[w, plinth, d - 0.08]} position={[0, plinth / 2, -0.04]} material={materials.charcoal} />}
+      <Block size={[w, h, d - 0.02]} position={[0, h / 2, -0.01]} material={materials.panel} />
       {[-1, 1].map((side) => (
         <group key={side}>
-          <Block size={[w / 2, body - 0.012, 0.02]} position={[(side * w) / 4, mid, d / 2 - 0.01]} material={doors} />
+          <Block size={[w / 2, h - 0.012, 0.02]} position={[(side * w) / 4, h / 2, d / 2 - 0.01]} material={doors} />
           <Block size={[0.012, Math.min(0.3, h * 0.3), 0.012]} position={[side * 0.04, Math.min(1.0, h * 0.72), d / 2 + 0.006]} material={materials.steel} />
         </group>
       ))}
@@ -114,7 +110,7 @@ function Cabinet({ size: [w, d, h], doors, plinth = 0 }: PieceProps & { doors: M
 }
 
 export const Closet = ({ size }: PieceProps) => <Cabinet size={size} doors={materials.panel} />
-export const ShoeCabinet = ({ size }: PieceProps) => <Cabinet size={size} doors={materials.oak} plinth={0.1} />
+export const ShoeCabinet = ({ size }: PieceProps) => <Cabinet size={size} doors={materials.oak} />
 
 export function Sideboard({ size }: PieceProps) {
   const [w, , h] = size
