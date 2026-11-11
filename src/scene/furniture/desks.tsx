@@ -38,12 +38,23 @@ function StudioDisplay({ position }: { position: readonly [number, number, numbe
   )
 }
 
+function DeskLamp({ position }: { position: readonly [number, number, number] }) {
+  return (
+    <group position={[position[0], position[1], position[2]]}>
+      <Cyl radius={0.06} height={0.015} position={[0, 0.008, 0]} material={materials.steel} />
+      <Cyl radius={0.007} height={0.22} position={[0, 0.12, 0]} material={materials.steel} />
+      <WashiShade size={[0.2, 0.16, 0.2]} position={[0, 0.3, 0]} power={1.4} />
+    </group>
+  )
+}
+
 export function WorkDesk({ size }: PieceProps) {
   const [w, d, h] = size
   return (
     <group>
       <DeskBase size={size} />
       <StudioDisplay position={[0, h, -d / 2 + 0.2]} />
+      <DeskLamp position={[w / 2 - 0.16, h, -d / 2 + 0.16]} />
       <Soft size={[0.127, 0.05, 0.127]} position={[w / 2 - 0.3, h - TOP - 0.03, -0.12]} material={materials.aluminium} radius={0.012} />
       <Soft size={[0.28, 0.008, 0.115]} position={[-0.08, h + 0.004, 0.12]} material={materials.aluminium} radius={0.003} />
       <Block size={[0.265, 0.003, 0.1]} position={[-0.08, h + 0.009, 0.12]} material={materials.porcelain} />
@@ -63,9 +74,7 @@ export function StudyDesk({ size }: PieceProps) {
       <Block size={[0.31, 0.215, 0.008]} position={[0, h + 0.11, -0.085]} rotation={[-0.3, 0, 0]} material={materials.aluminium} />
       <Block size={[0.22, 0.05, 0.16]} position={[-w / 2 + 0.2, h + 0.025, -0.05]} material={materials.terracotta} />
       <Block size={[0.2, 0.03, 0.15]} position={[-w / 2 + 0.2, h + 0.065, -0.05]} material={materials.linen} rotation={[0, 0.25, 0]} />
-      <Cyl radius={0.06} height={0.015} position={[w / 2 - 0.16, h + 0.008, -d / 2 + 0.16]} material={materials.steel} />
-      <Cyl radius={0.007} height={0.22} position={[w / 2 - 0.16, h + 0.12, -d / 2 + 0.16]} material={materials.steel} />
-      <WashiShade size={[0.2, 0.16, 0.2]} position={[w / 2 - 0.16, h + 0.3, -d / 2 + 0.16]} power={1.4} />
+      <DeskLamp position={[w / 2 - 0.16, h, -d / 2 + 0.16]} />
     </group>
   )
 }

@@ -7,8 +7,6 @@ export type FurnitureKind =
   | 'workDesk'
   | 'studyDesk'
   | 'workChair'
-  | 'loungeChair'
-  | 'floorLamp'
   | 'displayShelf'
   | 'bookshelf'
   | 'closet'
@@ -28,6 +26,9 @@ export type FurnitureKind =
   | 'washingMachine'
   | 'clothesRack'
   | 'downlight'
+  | 'catLitter'
+  | 'catFood'
+  | 'catTower'
 
 export type Furniture = {
   kind: FurnitureKind
@@ -52,22 +53,14 @@ const EAST = 90
 const NORTH = 180
 const WEST = 270
 
-const dining: Vec2 = [4.6, 7.1]
-const diningChairs = [45, 135, 225, 315].map((angle) => {
-  const radians = (angle * Math.PI) / 180
-  const reach = 0.7
-  return item(
-    'diningChair',
-    'ld',
-    [dining[0] + Math.sin(radians) * reach, dining[1] + Math.cos(radians) * reach],
-    angle + 180,
-    [0.44, 0.46, 0.78],
-  )
-})
+const dining: Vec2 = [4.55, 7.0]
+// Far enough under the table that the seat's front edge is tucked in.
+const CHAIR_REACH = 0.55
+const diningChair = (side: -1 | 1) =>
+  item('diningChair', 'ld', [dining[0] + side * CHAIR_REACH, dining[1]], side < 0 ? EAST : WEST, [0.44, 0.46, 0.78])
 
 export const furniture: Furniture[] = [
   // 洋室(1): bedroom
-  item('rug', 'bedroom', [1.5, 1.95], SOUTH, [1.9, 2.7, 0.012]),
   item('bed', 'bedroom', [1.12, 1.95], EAST, [1.6, 2.04, 0.85]),
   item('bedsideTable', 'bedroom', [0.31, 0.95], EAST, [0.36, 0.4, 0.45]),
   item('bedsideTable', 'bedroom', [0.31, 2.97], EAST, [0.36, 0.4, 0.45]),
@@ -78,7 +71,6 @@ export const furniture: Furniture[] = [
   item('workChair', 'study', [5.0, 1.0], NORTH, [0.6, 0.6, 0.92]),
   item('bookshelf', 'study', [5.75, 2.5], WEST, [1.4, 0.3, 1.8]),
   item('closet', 'study', [4.29, 3.12], NORTH, [0.92, 0.95, 2.4]),
-  item('rug', 'study', [4.95, 1.25], SOUTH, [1.5, 1.3, 0.012]),
   item('downlight', 'study', [4.9, 1.8], SOUTH, [0.1, 0.1, 2.3]),
 
   // Entrance and corridor
@@ -102,20 +94,21 @@ export const furniture: Furniture[] = [
   item('downlight', 'passage', [3.22, 5.3], SOUTH, [0.1, 0.1, 2.3]),
 
   // LD: dining by the counter, lounge by the window
-  item('diningTable', 'ld', dining, SOUTH, [1.1, 1.1, 0.72]),
-  ...diningChairs,
+  item('diningTable', 'ld', dining, SOUTH, [1.0, 1.0, 0.72]),
+  diningChair(-1),
+  diningChair(1),
   item('pendant', 'ld', dining, SOUTH, [0.6, 0.6, 0.42]),
-  item('rug', 'ld', [4.35, 9.25], SOUTH, [2.0, 2.4, 0.012]),
-  item('sofa', 'ld', [5.45, 9.1], WEST, [2.0, 0.9, 0.66]),
-  item('coffeeTable', 'ld', [4.35, 9.0], EAST, [1.0, 0.5, 0.32]),
-  item('loungeChair', 'ld', [3.95, 10.3], 140, [0.72, 0.78, 0.74]),
+  item('rug', 'ld', [4.3, 9.1], SOUTH, [1.4, 2.0, 0.012]),
+  item('sofa', 'ld', [5.45, 9.1], WEST, [1.8, 0.9, 0.66]),
+  item('coffeeTable', 'ld', [4.3, 9.1], EAST, [1.0, 0.5, 0.32]),
+  item('catFood', 'ld', [2.87, 6.95], EAST, [0.5, 0.3, 0.1]),
   item('plant', 'ld', [5.55, 10.5], SOUTH, [0.5, 0.5, 1.75]),
 
   // 洋室(2): hobby and work room
   item('workDesk', 'workroom', [0.48, 9.4], EAST, [1.6, 0.75, 0.72]),
   item('workChair', 'workroom', [1.2, 9.4], WEST, [0.6, 0.6, 0.92]),
-  item('displayShelf', 'workroom', [2.08, 7.51], SOUTH, [0.95, 0.3, 1.6]),
-  item('loungeChair', 'workroom', [1.7, 10.2], 215, [0.72, 0.78, 0.74]),
-  item('floorLamp', 'workroom', [2.42, 10.64], SOUTH, [0.3, 0.3, 1.5]),
+  item('displayShelf', 'workroom', [0.45, 7.51], SOUTH, [0.6, 0.3, 1.6]),
   item('plant', 'workroom', [0.4, 10.58], SOUTH, [0.4, 0.4, 1.2]),
+  item('catLitter', 'workroom', [2.3, 7.68], SOUTH, [0.5, 0.6, 0.45]),
+  item('catTower', 'workroom', [2.2, 10.45], NORTH, [0.6, 0.6, 1.5]),
 ]

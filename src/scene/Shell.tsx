@@ -1,5 +1,5 @@
-import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useMemo, useRef } from 'react'
 import { BoxGeometry, type Group, MathUtils, type Material } from 'three'
 import {
   bounds,
@@ -207,20 +207,13 @@ function SlidingDoor({
 // part of the wall at the `from` end of the opening.
 function SlidingWall({ opening }: { opening: Extract<Opening, { kind: 'slidingWall' }> }) {
   const { wallOpen } = useSceneState()
-  const invalidate = useThree((state) => state.invalidate)
   const group = useRef<Group>(null)
   const panelWidth = opening.width / opening.panels
   const trackGap = 0.032
 
-  // Frames are rendered on demand: one to start the panels moving, then
-  // one more for as long as a panel is short of its place.
-  useEffect(() => invalidate(), [wallOpen, invalidate])
   useFrame((_, delta) => {
     group.current?.children.forEach((panel, index) => {
-      const target = wallOpen ? 0 : index * panelWidth
-      if (Math.abs(panel.position.x - target) < 1e-4) return
-      panel.position.x = MathUtils.damp(panel.position.x, target, 5, delta)
-      invalidate()
+      panel.position.x = MathUtils.damp(panel.position.x, wallOpen ? 0 : index * panelWidth, 5, delta)
     })
   })
 

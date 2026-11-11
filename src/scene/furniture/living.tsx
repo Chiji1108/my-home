@@ -48,17 +48,6 @@ export function Pendant({ size }: PieceProps) {
   )
 }
 
-export function FloorLamp({ size: [w, , h] }: PieceProps) {
-  const shade = 0.34
-  return (
-    <group>
-      <Cyl radius={w / 2 - 0.03} height={0.02} position={[0, 0.01, 0]} material={materials.steel} />
-      <Cyl radius={0.01} height={h - shade} position={[0, (h - shade) / 2, 0]} material={materials.steel} />
-      <WashiShade size={[w, shade, w]} position={[0, h - shade / 2, 0]} power={4.5} castShadow />
-    </group>
-  )
-}
-
 /** A recessed ceiling light: no visible fixture, only a cone of light in the evening. */
 export function Downlight({ size }: PieceProps) {
   const { night } = useSceneState()

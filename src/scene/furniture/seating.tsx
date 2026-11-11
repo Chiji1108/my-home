@@ -25,23 +25,6 @@ export function WorkChair({ size: [w, d, h] }: PieceProps) {
   )
 }
 
-export function LoungeChair({ size: [w, d, h] }: PieceProps) {
-  const post = 0.04
-  const arm = 0.52
-  return (
-    <group>
-      {[-1, 1].flatMap((sx) => [
-        <Block key={`front${sx}`} size={[post, arm, post]} position={[sx * (w / 2 - post / 2), arm / 2, d / 2 - 0.08]} material={materials.oak} />,
-        <Block key={`back${sx}`} size={[post, h, post]} position={[sx * (w / 2 - post / 2), h / 2, -d / 2 + 0.06]} material={materials.oak} />,
-        <Block key={`arm${sx}`} size={[0.06, 0.025, d - 0.08]} position={[sx * (w / 2 - post / 2), arm + 0.0125, 0]} material={materials.oak} />,
-      ])}
-      <Block size={[w - 0.08, 0.03, d - 0.14]} position={[0, 0.26, 0]} material={materials.oak} />
-      <Soft size={[w - 0.1, 0.13, d - 0.2]} position={[0, 0.34, 0.04]} material={materials.linen} radius={0.05} />
-      <Soft size={[w - 0.1, h - 0.3, 0.12]} position={[0, 0.3 + (h - 0.3) / 2, -d / 2 + 0.16]} rotation={[-0.22, 0, 0]} material={materials.linen} radius={0.05} />
-    </group>
-  )
-}
-
 export function Sofa({ size: [w, d, h] }: PieceProps) {
   const arm = 0.16
   const seatWidth = (w - arm * 2) / 2
