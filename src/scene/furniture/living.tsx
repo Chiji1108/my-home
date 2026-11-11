@@ -50,7 +50,7 @@ export function Pendant({ size }: PieceProps) {
 
 /** A recessed ceiling light: no visible fixture, only a cone of light in the evening. */
 export function Downlight({ size }: PieceProps) {
-  const { night } = useSceneState()
+  const { night, indirect } = useSceneState()
   const [target] = useState(() => new Object3D())
   if (!night) return null
   return (
@@ -61,7 +61,7 @@ export function Downlight({ size }: PieceProps) {
         position={[0, size[2], 0]}
         target={target}
         color={light.lamp}
-        intensity={8}
+        intensity={indirect ? 4 : 8}
         angle={1.1}
         penumbra={1}
         distance={6}
