@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "model-room",
+  // No Worker code: Vite builds a single page, and Workers' static assets
+  // serve dist/.
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist"
+  },
+  "workers_dev": true
+}

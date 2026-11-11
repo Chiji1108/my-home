@@ -1,0 +1,121 @@
+:root {
+  --ink: #2b2925;
+  --ink-soft: #6d685f;
+  --surface: rgb(250 247 241 / 0.78);
+  --surface-active: #2b2925;
+  --on-active: #f6f2ea;
+  --hairline: rgb(43 41 37 / 0.1);
+  font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Noto Sans JP', system-ui, sans-serif;
+  color: var(--ink);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #e8e3da;
+  overscroll-behavior: none;
+}
+
+canvas {
+  touch-action: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px calc(14px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.overlay[data-night='true'] {
+  --ink: #f1ece2;
+  --ink-soft: #b1ab9f;
+  --surface: rgb(30 33 41 / 0.72);
+  --surface-active: #f1ece2;
+  --on-active: #22252d;
+  --hairline: rgb(241 236 226 / 0.14);
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.08);
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.views {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pill button,
+.toggle span {
+  display: block;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.pill button[aria-pressed='true'],
+.toggle input:checked + span {
+  background: var(--surface-active);
+  color: var(--on-active);
+}
+
+.pill button:focus-visible,
+.toggle input:focus-visible + span {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.toggle legend {
+  float: left;
+  padding: 0 6px 0 11px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
