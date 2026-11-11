@@ -103,7 +103,7 @@ export const furniture: Furniture[] = [
   // Stands off the wall to leave a gap for the strip on its back.
   item('sofa', 'ld', [5.33, 9.1], WEST, [1.8, 0.9, 0.66]),
   item('coffeeTable', 'ld', [4.3, 9.1], EAST, [1.0, 0.5, 0.32]),
-  item('catFood', 'ld', [2.87, 6.95], EAST, [0.5, 0.3, 0.1]),
+  item('catFood', 'ld', [5.76, 7.85], WEST, [0.5, 0.3, 0.1]),
   item('plant', 'ld', [5.55, 10.5], SOUTH, [0.5, 0.5, 1.75]),
 
   // 洋室(2): hobby and work room
