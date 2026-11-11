@@ -80,11 +80,16 @@ function LampLight({ power, castShadow = false }: { power: number; castShadow?: 
     <pointLight
       color={light.lamp}
       intensity={power}
-      distance={7}
+      // A lamp without shadows shines through walls, so it reaches no
+      // further than its own corner of the room.
+      distance={castShadow ? 7 : 2.5}
       decay={2}
       castShadow={castShadow}
       shadow-mapSize={[1024, 1024]}
-      shadow-bias={-0.002}
+      // Walls stand closer to a lamp than the default near plane, and
+      // anything nearer than that plane casts no shadow.
+      shadow-camera-near={0.1}
+      shadow-bias={-0.0005}
     />
   )
 }

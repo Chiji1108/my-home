@@ -54,7 +54,7 @@ export function FloorLamp({ size: [w, , h] }: PieceProps) {
     <group>
       <Cyl radius={w / 2 - 0.03} height={0.02} position={[0, 0.01, 0]} material={materials.steel} />
       <Cyl radius={0.01} height={h - shade} position={[0, (h - shade) / 2, 0]} material={materials.steel} />
-      <WashiShade size={[w, shade, w]} position={[0, h - shade / 2, 0]} power={4.5} />
+      <WashiShade size={[w, shade, w]} position={[0, h - shade / 2, 0]} power={4.5} castShadow />
     </group>
   )
 }
@@ -65,10 +65,24 @@ export function Downlight({ size }: PieceProps) {
   const [target] = useState(() => new Object3D())
   if (!night) return null
   return (
-    <group position={[0, size[2], 0]}>
-      <primitive object={target} position={[0, -1, 0]} />
-      <spotLight target={target} color={light.lamp} intensity={8} angle={1.1} penumbra={1} distance={6} decay={2} />
-    </group>
+    <>
+      <primitive object={target} />
+      <spotLight
+        castShadow
+        position={[0, size[2], 0]}
+        target={target}
+        color={light.lamp}
+        intensity={8}
+        angle={1.1}
+        penumbra={1}
+        distance={6}
+        decay={2}
+        shadow-mapSize={[1024, 1024]}
+        // The tops of the walls are nearer than the default near plane.
+        shadow-camera-near={0.1}
+        shadow-bias={-0.0005}
+      />
+    </>
   )
 }
 

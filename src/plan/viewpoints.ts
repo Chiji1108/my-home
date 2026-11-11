@@ -27,7 +27,7 @@ export const viewpoints = [
   { id: 'ld', label: 'LD', kind: 'eye', position: [3.2, 5.4], lookAt: [4.6, 9.5], lookAtHeight: 0.9 },
   { id: 'kitchen', label: 'キッチン', kind: 'eye', position: [2.95, 4.8], lookAt: [5.6, 4.9], lookAtHeight: 1.0 },
   { id: 'workroom', label: '仕事部屋', kind: 'eye', position: [2.3, 7.75], lookAt: [0.7, 9.7], lookAtHeight: 0.9 },
-  { id: 'bedroom', label: '寝室', kind: 'eye', position: [2.4, 3.42], lookAt: [0.6, 1.4], lookAtHeight: 0.6 },
+  { id: 'bedroom', label: '寝室', kind: 'eye', position: [2.45, 3.0], lookAt: [0.6, 1.4], lookAtHeight: 0.6 },
   { id: 'study', label: '書斎', kind: 'eye', position: [4.15, 2.4], lookAt: [5.3, 0.4], lookAtHeight: 0.9 },
   { id: 'entrance', label: '玄関', kind: 'eye', position: [3.05, 0.35], lookAt: [3.45, 4.4], lookAtHeight: 1.1 },
 ] as const satisfies readonly Viewpoint[]

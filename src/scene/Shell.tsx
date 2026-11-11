@@ -1,7 +1,8 @@
-import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, type Group, MathUtils, type Material } from 'three'
 import {
+  bounds,
   type FloorFinish,
   type Opening,
   type Rect,
@@ -51,9 +52,9 @@ function slabGeometry(rect: Rect, thickness: number) {
   return geometry
 }
 
-function Floor({ room }: { room: Room }) {
-  const geometry = useMemo(() => slabGeometry(room.rect, FLOOR_THICKNESS), [room])
-  const [cx, cy] = rectCentre(room.rect)
+function Floor({ room, rect }: { room: Room; rect: Rect }) {
+  const geometry = useMemo(() => slabGeometry(rect, FLOOR_THICKNESS), [rect])
+  const [cx, cy] = rectCentre(rect)
   return (
     <mesh
       receiveShadow
@@ -64,9 +65,9 @@ function Floor({ room }: { room: Room }) {
   )
 }
 
-function Ceiling({ room, height }: { room: Room; height: number }) {
-  const [width, depth] = rectSize(room.rect)
-  const [cx, cy] = rectCentre(room.rect)
+function Ceiling({ rect, height }: { rect: Rect; height: number }) {
+  const [width, depth] = rectSize(rect)
+  const [cx, cy] = rectCentre(rect)
   return (
     <Block
       size={[width, CEILING_THICKNESS, depth]}
@@ -90,29 +91,42 @@ function isOn(point: Vec2, wall: Wall) {
 const isParallel = (a: Wall, b: Wall) =>
   Math.abs((a.to[0] - a.from[0]) * (b.to[1] - b.from[1]) - (a.to[1] - a.from[1]) * (b.to[0] - b.from[0])) < 1e-6
 
-// A wall end that meets a crossing wall runs on to that wall's far face, so
-// corners close. Ends that butt a wall in line with them stop at the joint.
-const meetsCrossingWall = (point: Vec2, wall: Wall) =>
-  walls.some((other) => other !== wall && !isParallel(other, wall) && isOn(point, other))
+const isEndOf = (point: Vec2, wall: Wall) =>
+  [wall.from, wall.to].some((end) => Math.hypot(end[0] - point[0], end[1] - point[1]) < 1e-6)
+
+// How far a wall end is moved outwards so that it joins the wall crossing it
+// without the two overlapping. Where two walls end in a corner, the one
+// listed first runs on to the other's outer face. Every other end stops at
+// the near face of the wall it meets. Ends that butt a wall in line with
+// them stay at the joint.
+function extension(point: Vec2, wall: Wall) {
+  const other = walls.find((candidate) => candidate !== wall && !isParallel(candidate, wall) && isOn(point, candidate))
+  if (!other) return 0
+  const ownsCorner = isEndOf(point, other) && walls.indexOf(wall) < walls.indexOf(other)
+  return ((ownsCorner ? 1 : -1) * other.thickness) / 2
+}
+
+// Walls start at the lowest floor, so none is left hanging over a room
+// that sits below the main floor.
+const WALL_BASE = Math.min(...rooms.map((room) => room.level))
 
 type Piece = { x0: number; x1: number; y0: number; y1: number }
 
 function solidPieces(wall: Wall): Piece[] {
-  const overrun = wall.thickness / 2
-  const start = meetsCrossingWall(wall.from, wall) ? -overrun : 0
-  const end = length(wall) + (meetsCrossingWall(wall.to, wall) ? overrun : 0)
+  const start = -extension(wall.from, wall)
+  const end = length(wall) + extension(wall.to, wall)
   const pieces: Piece[] = []
   let cursor = start
   for (const opening of wall.openings.toSorted((a, b) => a.offset - b.offset)) {
     const right = opening.offset + opening.width
     const sill = sillOf(opening)
     const head = sill + opening.height
-    pieces.push({ x0: cursor, x1: opening.offset, y0: 0, y1: wall.height })
-    pieces.push({ x0: opening.offset, x1: right, y0: 0, y1: sill })
+    pieces.push({ x0: cursor, x1: opening.offset, y0: WALL_BASE, y1: wall.height })
+    pieces.push({ x0: opening.offset, x1: right, y0: WALL_BASE, y1: sill })
     pieces.push({ x0: opening.offset, x1: right, y0: head, y1: wall.height })
     cursor = right
   }
-  pieces.push({ x0: cursor, x1: end, y0: 0, y1: wall.height })
+  pieces.push({ x0: cursor, x1: end, y0: WALL_BASE, y1: wall.height })
   return pieces.filter((piece) => piece.x1 - piece.x0 > 1e-6 && piece.y1 - piece.y0 > 1e-6)
 }
 
@@ -193,14 +207,20 @@ function SlidingDoor({
 // part of the wall at the `from` end of the opening.
 function SlidingWall({ opening }: { opening: Extract<Opening, { kind: 'slidingWall' }> }) {
   const { wallOpen } = useSceneState()
+  const invalidate = useThree((state) => state.invalidate)
   const group = useRef<Group>(null)
   const panelWidth = opening.width / opening.panels
   const trackGap = 0.032
 
+  // Frames are rendered on demand: one to start the panels moving, then
+  // one more for as long as a panel is short of its place.
+  useEffect(() => invalidate(), [wallOpen, invalidate])
   useFrame((_, delta) => {
     group.current?.children.forEach((panel, index) => {
       const target = wallOpen ? 0 : index * panelWidth
+      if (Math.abs(panel.position.x - target) < 1e-4) return
       panel.position.x = MathUtils.damp(panel.position.x, target, 5, delta)
+      invalidate()
     })
   })
 
@@ -257,12 +277,20 @@ function WallView({ wall }: { wall: Wall }) {
   )
 }
 
-export function Shell({ showCeilings }: { showCeilings: boolean }) {
+export function Shell() {
+  const ceilings = useRef<Group>(null)
+
+  // Ceilings are lifted off while the camera is above them, so that it
+  // can look down into the rooms.
+  useFrame(({ camera }) => {
+    if (ceilings.current) ceilings.current.visible = camera.position.y < bounds.height
+  })
+
   return (
     <group>
-      {rooms.map((room) => (
-        <Floor key={room.id} room={room} />
-      ))}
+      {rooms.flatMap((room) =>
+        room.rects.map((rect, index) => <Floor key={`${room.id}:${index}`} room={room} rect={rect} />),
+      )}
       {walls.map((wall) => (
         <WallView key={`${wall.from}:${wall.to}`} wall={wall} />
       ))}
@@ -278,10 +306,11 @@ export function Shell({ showCeilings }: { showCeilings: boolean }) {
           />
         )
       })}
-      <group visible={showCeilings}>
-        {rooms.map(
-          (room) =>
-            room.ceilingHeight !== null && <Ceiling key={room.id} room={room} height={room.ceilingHeight} />,
+      <group ref={ceilings}>
+        {rooms.flatMap(({ id, rects, ceilingHeight }) =>
+          ceilingHeight === null
+            ? []
+            : rects.map((rect, index) => <Ceiling key={`${id}:${index}`} rect={rect} height={ceilingHeight} />),
         )}
       </group>
     </group>

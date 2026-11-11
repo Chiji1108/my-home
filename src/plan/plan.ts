@@ -29,7 +29,8 @@ export type RoomId =
 export type Room = {
   id: RoomId
   name: string
-  rect: Rect
+  /** Floor area. An L-shaped room is made of more than one rectangle. */
+  rects: Rect[]
   floor: FloorFinish
   /** Height of the floor surface relative to the main floor. */
   level: number
@@ -68,27 +69,28 @@ const rect = (x0: number, y0: number, x1: number, y1: number): Rect => ({ x0, y0
 const room = (
   id: RoomId,
   name: string,
-  r: Rect,
+  rects: Rect[],
   floor: FloorFinish = 'oak',
   level = 0,
   ceilingHeight: number | null = CEILING,
-): Room => ({ id, name, rect: r, floor, level, ceilingHeight })
+): Room => ({ id, name, rects, floor, level, ceilingHeight })
 
 export const rooms: Room[] = [
-  room('bedroom', '洋室(1)', rect(0, 0, 2.67, 3.65)),
-  room('entrance', '玄関', rect(2.67, 0, 3.78, 1.0), 'tile', -0.08),
-  room('corridor', '廊下', rect(2.67, 1.0, 3.78, 4.4)),
-  room('study', '洋室(3)', rect(3.78, 0, 6, 3.65)),
-  room('wicNorth', 'ウォークインクロゼット', rect(0, 3.65, 1.7, 4.55)),
-  room('toilet', 'トイレ', rect(1.7, 3.65, 2.67, 4.9), 'tile'),
-  room('bath', '浴室', rect(0, 4.55, 1.7, 6.5), 'bathTile'),
-  room('washroom', '洗面室', rect(1.7, 4.9, 2.67, 7.3), 'tile'),
-  room('wicSouth', 'ウォークインクロゼット', rect(0, 6.5, 1.7, 7.3)),
-  room('kitchen', 'キッチン', rect(3.78, 3.65, 6, 6.0)),
-  room('passage', '廊下', rect(2.67, 4.4, 3.78, 6.0)),
-  room('ld', 'リビング・ダイニング', rect(2.67, 6.0, 6, 10.95)),
-  room('workroom', '洋室(2)', rect(0, 7.3, 2.67, 10.95)),
-  room('balcony', 'バルコニー', rect(0, 10.95, 6, 12.7), 'balcony', -0.1, null),
+  room('bedroom', '洋室(1)', [rect(0, 0, 2.67, 3.65)]),
+  // The entrance includes the shoe-cabinet notch on its east side.
+  room('entrance', '玄関', [rect(2.67, 0, 3.78, 1.0), rect(3.78, 0, 4.2, 1.1)], 'tile', -0.08),
+  room('corridor', '廊下', [rect(2.67, 1.0, 3.78, 4.4)]),
+  room('study', '洋室(3)', [rect(4.2, 0, 6, 3.65), rect(3.78, 1.1, 4.2, 3.65)]),
+  room('wicNorth', 'ウォークインクロゼット', [rect(0, 3.65, 1.7, 4.55)]),
+  room('toilet', 'トイレ', [rect(1.7, 3.65, 2.67, 4.9)], 'tile'),
+  room('bath', '浴室', [rect(0, 4.55, 1.7, 6.5)], 'bathTile'),
+  room('washroom', '洗面室', [rect(1.7, 4.9, 2.67, 7.3)], 'tile'),
+  room('wicSouth', 'ウォークインクロゼット', [rect(0, 6.5, 1.7, 7.3)]),
+  room('kitchen', 'キッチン', [rect(3.78, 3.65, 6, 6.0)]),
+  room('passage', '廊下', [rect(2.67, 4.4, 3.78, 6.0)]),
+  room('ld', 'リビング・ダイニング', [rect(2.67, 6.0, 6, 10.95)]),
+  room('workroom', '洋室(2)', [rect(0, 7.3, 2.67, 10.95)]),
+  room('balcony', 'バルコニー', [rect(0, 10.95, 6, 12.7)], 'balcony', -0.1, null),
 ]
 
 const wall = (

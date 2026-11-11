@@ -37,17 +37,18 @@ export function plankTexture() {
     const width = size / planks
     for (let i = 0; i < planks; i++) {
       const joint = random() * size
-      for (const [start, length] of [
-        [joint - size, size * 0.5],
-        [joint - size * 0.5, size * 0.5],
-        [joint, size * 0.5],
-        [joint + size * 0.5, size * 0.5],
-      ] as const) {
+      const board = size / 2
+      for (const start of [joint, joint + board]) {
         const shade = 218 + random() * 37
-        ctx.fillStyle = `rgb(${shade}, ${shade - 3}, ${shade - 8})`
-        ctx.fillRect(i * width, start, width, length)
-        ctx.fillStyle = 'rgba(90, 60, 30, 0.35)'
-        ctx.fillRect(i * width, start, width, 1.5)
+        // Drawn a second time one tile up, so a board that runs off the
+        // bottom edge continues from the top and the texture repeats
+        // without a seam.
+        for (const y of [start, start - size]) {
+          ctx.fillStyle = `rgb(${shade}, ${shade - 3}, ${shade - 8})`
+          ctx.fillRect(i * width, y, width, board)
+          ctx.fillStyle = 'rgba(90, 60, 30, 0.35)'
+          ctx.fillRect(i * width, y, width, 1.5)
+        }
       }
       ctx.fillStyle = 'rgba(90, 60, 30, 0.4)'
       ctx.fillRect(i * width, 0, 1.5, size)
