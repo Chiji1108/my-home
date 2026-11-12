@@ -177,7 +177,7 @@ export const walls: Wall[] = [
   wall([0, 0], [0, 10.95], [], OUTER),
 
   // The x = 2.67 spine: bedroom, toilet, washroom, then the sliding wall
-  // between the workroom and the LD.
+  // that is the whole of the boundary between the workroom and the LD.
   wall(
     [2.67, 0],
     [2.67, 10.95],
@@ -185,7 +185,14 @@ export const walls: Wall[] = [
       { kind: 'door', offset: 2.7, width: 0.8, height: DOOR, hinge: 'end', swingsTo: 'right', ajar: 80, leaf: 'oak' },
       { kind: 'door', offset: 3.72, width: 0.62, height: DOOR, hinge: 'start', swingsTo: 'left', ajar: 0, leaf: 'oak' },
       { kind: 'slidingDoor', offset: 5.9, width: 0.7, height: DOOR, leafSide: 'right', slidesTo: 'end' },
-      { kind: 'slidingWall', offset: 8.0, width: 2.7, height: 2.25, panels: 3 },
+      // From the face of the closet wall to the inner face of the balcony wall.
+      {
+        kind: 'slidingWall',
+        offset: 7.3 + INNER / 2,
+        width: 10.95 - OUTER / 2 - (7.3 + INNER / 2),
+        height: 2.25,
+        panels: 4,
+      },
     ],
   ),
 
