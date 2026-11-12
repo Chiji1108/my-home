@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useState } from 'react'
 import { Euler, MathUtils, type PerspectiveCamera, Quaternion, Raycaster, Vector2, Vector3 } from 'three'
 import { move, obstacles } from '../plan/collision'
-import type { Vec2 } from '../plan/plan'
+import { floorLevelAt, type Vec2 } from '../plan/plan'
 import { EYE_HEIGHT, type EyeViewpoint } from '../plan/viewpoints'
 import { useSceneState } from './SceneState'
 
@@ -172,7 +172,8 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     body.position = next
 
     const ease = 1 - Math.exp(-EASE * dt)
-    camera.position.lerp(eye.set(next[0], EYE_HEIGHT, next[1]), ease)
+    // The eye rides at its height above whichever floor the body is on.
+    camera.position.lerp(eye.set(next[0], (floorLevelAt(next) ?? 0) + EYE_HEIGHT, next[1]), ease)
     camera.quaternion.slerp(gaze.setFromEuler(angles.set(body.pitch, body.yaw, 0)), ease)
   })
 

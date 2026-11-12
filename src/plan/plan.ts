@@ -45,7 +45,13 @@ type Span = { offset: number; width: number; height: number }
 export type Opening =
   | (Span & { kind: 'door'; hinge: End; swingsTo: Side; ajar: number; leaf: 'oak' | 'steel' })
   | (Span & { kind: 'slidingDoor'; leafSide: Side; slidesTo: End })
-  | (Span & { kind: 'window'; sill: number; glass: 'clear' | 'frosted' })
+  | (Span & {
+      kind: 'window'
+      sill: number
+      glass: 'clear' | 'frosted'
+      /** A sash slid aside leaves this much of the opening clear, measured from that end. */
+      way?: { at: End; width: number }
+    })
   | (Span & { kind: 'slidingWall'; panels: number })
 
 export type Wall = {
@@ -87,6 +93,12 @@ export function besideOpening(wall: Wall, opening: Opening): [left: Vec2, right:
     wall.from[1] + axis[1] * middle + side * axis[0] * reach,
   ]
   return [beside(-1), beside(1)]
+}
+
+/** The stretch of a window that a sash slid aside leaves clear, as offsets along the wall. */
+export function clearWay({ offset, width, way }: Extract<Opening, { kind: 'window' }>): [number, number] | null {
+  if (!way) return null
+  return way.at === 'start' ? [offset, offset + way.width] : [offset + width - way.width, offset + width]
 }
 
 /** Opened, the panels of a sliding wall stack where the first one stands, at the `from` end. */
@@ -150,13 +162,15 @@ const northWindow = (offset: number): Opening => ({
   glass: 'frosted',
 })
 
-const balconyWindow = (offset: number, width: number): Opening => ({
+// A pair of sliding sashes. One of them may stand open, as the way out.
+const balconyWindow = (offset: number, width: number, open?: End): Opening => ({
   kind: 'window',
   offset,
   width,
   height: DOOR,
   sill: 0,
   glass: 'clear',
+  ...(open && { way: { at: open, width: width / 2 } }),
 })
 
 export const walls: Wall[] = [
@@ -173,7 +187,7 @@ export const walls: Wall[] = [
   ),
   wall([6, 0], [6, 6.0], [], OUTER),
   wall([6, 6.0], [6, 10.95], [], OUTER, 'concrete'),
-  wall([0, 10.95], [6, 10.95], [balconyWindow(0.4, 2.0), balconyWindow(3.0, 2.6)], OUTER),
+  wall([0, 10.95], [6, 10.95], [balconyWindow(0.4, 2.0), balconyWindow(3.0, 2.6, 'start')], OUTER),
   wall([0, 0], [0, 10.95], [], OUTER),
 
   // The x = 2.67 spine: bedroom, toilet, washroom, then the sliding wall

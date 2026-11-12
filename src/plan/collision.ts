@@ -5,6 +5,7 @@
 import { type Furniture, type FurnitureKind, furniture } from './furniture'
 import {
   besideOpening,
+  clearWay,
   floorLevelAt,
   type Opening,
   panelWidth,
@@ -28,20 +29,20 @@ export type Box = {
 const passable: ReadonlySet<FurnitureKind> = new Set(['rug', 'pendant', 'downlight'])
 
 // The stretch of an opening that can be walked through, as offsets along
-// the wall. A door is a way through only where there is floor on both
-// sides. An open sliding wall is blocked only where its panels are stacked.
+// the wall. A door, or a window with a sash slid aside, is a way through
+// only where there is floor on both sides. An open sliding wall is blocked
+// only where its panels are stacked.
 function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] | null {
   const end = opening.offset + opening.width
+  const leadsSomewhere = () => besideOpening(wall, opening).every((point) => floorLevelAt(point) !== undefined)
   switch (opening.kind) {
     case 'window':
-      return null
+      return leadsSomewhere() ? clearWay(opening) : null
     case 'slidingWall':
       return wallOpen ? [opening.offset + panelWidth(opening), end] : null
     case 'door':
     case 'slidingDoor':
-      return besideOpening(wall, opening).every((point) => floorLevelAt(point) !== undefined)
-        ? [opening.offset, end]
-        : null
+      return leadsSomewhere() ? [opening.offset, end] : null
   }
 }
 

@@ -28,6 +28,8 @@ import { PLANK_TILE } from './textures'
 const FLOOR_THICKNESS = 0.2
 const CEILING_THICKNESS = 0.1
 const FRAME = 0.04
+/** How far either side of the wall's centre the two tracks of a pair of sashes run. */
+const SASH_TRACK = 0.012
 /** Width of the oak stile on the leading edge of a sliding wall panel. */
 const STILE = 0.02
 /** A sliding panel this close to where it is going is put there. */
@@ -156,11 +158,17 @@ function solidPieces(wall: Wall): Piece[] {
 // from `from`, y is up, and +z is the wall's right-hand side.
 const sideSign = (side: 'left' | 'right') => (side === 'right' ? 1 : -1)
 
+// A sash slid aside stands behind the other one, and the meeting stile
+// moves to the edge of the way it leaves clear.
 function Window({ opening, thickness }: { opening: Extract<Opening, { kind: 'window' }>; thickness: number }) {
-  const { width, height, sill, glass } = opening
+  const { width, height, sill, glass, way } = opening
   const depth = Math.min(0.07, thickness)
   const midY = sill + height / 2
-  const mullions = width > 1.5 ? [0, width / 2 - FRAME / 2, width - FRAME] : [0, width - FRAME]
+  const middle = width > 1.5 ? width / 2 - FRAME / 2 : null
+  const stile = way ? (way.at === 'start' ? way.width : width - way.width - FRAME) : middle
+  const mullions = [0, ...(stile === null ? [] : [stile]), width - FRAME]
+  const glassFrom = way?.at === 'start' ? way.width + FRAME : FRAME
+  const glassTo = way?.at === 'end' ? width - way.width - FRAME : width - FRAME
   return (
     <group position={[opening.offset, 0, 0]}>
       <Block size={[width, FRAME, depth]} position={[width / 2, sill + FRAME / 2, 0]} material={materials.steel} />
@@ -177,9 +185,15 @@ function Window({ opening, thickness }: { opening: Extract<Opening, { kind: 'win
           material={materials.steel}
         />
       ))}
-      <mesh position={[width / 2, midY, 0]} material={glass === 'frosted' ? materials.frostedGlass : materials.glass}>
-        <boxGeometry args={[width - FRAME * 2, height - FRAME * 2, 0.01]} />
-      </mesh>
+      {(way ? [-SASH_TRACK, SASH_TRACK] : [0]).map((z) => (
+        <mesh
+          key={z}
+          position={[(glassFrom + glassTo) / 2, midY, z]}
+          material={glass === 'frosted' ? materials.frostedGlass : materials.glass}
+        >
+          <boxGeometry args={[glassTo - glassFrom, height - FRAME * 2, 0.01]} />
+        </mesh>
+      ))}
     </group>
   )
 }
