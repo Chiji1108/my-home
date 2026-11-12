@@ -135,7 +135,7 @@ export function Closet({ id, size: [w, d, h] }: KnownPieceProps) {
       <group position={[0, 0, middle]}>
         <ClothesRack size={[inside[0], inside[1], shelf]} />
       </group>
-      <group {...doors}>
+      <group ref={doors}>
         {[-1, 1].map((side) => (
           <group key={side} position={[(side * w) / 2, 0, d / 2]}>
             <Block size={[w / 2, h - 0.012, DOOR]} position={[(-side * w) / 4, h / 2, -DOOR / 2]} material={materials.panel} />

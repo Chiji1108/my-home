@@ -39,10 +39,13 @@ export function Overlay({ walking, onOverview, onWalk, onPlace, night, onNight, 
   const locked = useLocked()
   const touching = useTouching()
   const action = target && (open[target] ? '閉める' : '開ける')
-  // A click of the mouse on the way into the walk is the moment to lock the pointer.
-  const walk = (enter: () => void) => (event: MouseEvent) => {
+  // A click of the mouse on the way into the walk is the moment to lock the
+  // pointer. The button is let go of, so that the keys are the walk's: a
+  // click made with a key keeps it.
+  const walk = (enter: () => void) => (event: MouseEvent<HTMLButtonElement>) => {
     enter()
     lockPointer(event.nativeEvent)
+    if (event.detail > 0) event.currentTarget.blur()
   }
 
   // With the pointer locked nothing can be pressed: only the aim is shown, and what E would do.

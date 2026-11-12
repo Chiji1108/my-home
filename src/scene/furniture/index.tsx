@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import { MathUtils } from 'three'
-import { type FurnitureKind, furniture, furnitureId } from '../../plan/furniture'
+import { type FurnitureKind, furniture, furnitureId, hasDoors } from '../../plan/furniture'
 import { rooms } from '../../plan/plan'
 import { Bed, BedsideTable, ClothesRack, Rug } from './bedroom'
 import { CatFood, CatLitter, CatTower } from './cat'
@@ -10,6 +10,7 @@ import { CoffeeTable, DiningTable, Downlight, FloorLamp, Pendant, Plant } from '
 import { Piano, PianoBench } from './piano'
 import { DiningChair, Sofa, WorkChair } from './seating'
 import { Closet, DisplayShelf, ShoeCabinet, Sideboard } from './storage'
+import { operableAs } from '../pointing'
 import type { KnownPieceProps } from './types'
 import { Bathtub, Toilet, Vanity, WashingMachine } from './wet'
 
@@ -58,6 +59,7 @@ export function FurnitureLayer() {
             key={index}
             position={[item.position[0], floorLevel[item.room] ?? 0, item.position[1]]}
             rotation-y={MathUtils.degToRad(item.rotation)}
+            userData={hasDoors(item) ? operableAs(furnitureId(item)) : {}}
           >
             <Piece id={furnitureId(item)} size={item.size} />
           </group>

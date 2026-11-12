@@ -13,15 +13,22 @@ export const isLocked = () => document.pointerLockElement !== null
 /** Whether the pointer is locked, which is what looking round with a mouse takes. */
 export const useLocked = () => useSyncExternalStore(onLockChange, isLocked)
 
+// A click is a pointer event in some browsers and a mouse event in others,
+// where what made it is told from the last pointer put down, and from the
+// count of clicks, which is none when a key did it.
+const byMouse = (event: MouseEvent) =>
+  'pointerType' in event ? event.pointerType === 'mouse' : !touching && event.detail > 0
+
 /**
  * Asks for the pointer to be locked. Only a mouse can be, and only from
  * within the handling of something the user did, so this is called with
- * the event. Being refused leaves things as they were.
+ * the event. Where there is no locking, or it is refused, things are left
+ * as they were, and the mouse looks round by dragging.
  */
-export function lockPointer(event: Event) {
-  if (!(event instanceof PointerEvent) || event.pointerType !== 'mouse' || isLocked()) return
+export function lockPointer(event: MouseEvent) {
+  if (!byMouse(event) || isLocked()) return
   // Browsers that return a promise reject it when they refuse.
-  void Promise.resolve(document.body.requestPointerLock()).catch(() => {})
+  void Promise.resolve(document.body.requestPointerLock?.()).catch(() => {})
 }
 
 let touching = false

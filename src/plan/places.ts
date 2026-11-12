@@ -32,8 +32,8 @@ export function eyeHeightOf(place: Place) {
 export const places = [
   { id: 'ld', label: 'LD', position: [3.2, 5.4], lookAt: [4.6, 9.5], lookAtHeight: 0.9 },
   { id: 'kitchen', label: 'キッチン', position: [2.95, 4.8], lookAt: [5.6, 4.9], lookAtHeight: 1.0 },
-  { id: 'workroom', label: '仕事部屋', position: [1.85, 7.7], lookAt: [0.7, 9.9], lookAtHeight: 0.9 },
+  { id: 'workroom', label: '仕事部屋', position: [1.8, 7.7], lookAt: [0.7, 9.9], lookAtHeight: 0.9 },
   { id: 'bedroom', label: '寝室', position: [2.45, 3.0], lookAt: [0.6, 1.4], lookAtHeight: 0.6 },
-  { id: 'hobby', label: '趣味部屋', position: [3.95, 2.45], lookAt: [5.5, 1.4], lookAtHeight: 0.8 },
+  { id: 'hobby', label: '趣味部屋', position: [4.1, 2.4], lookAt: [5.5, 1.4], lookAtHeight: 0.8 },
   { id: 'entrance', label: '玄関', position: [3.05, 0.35], lookAt: [3.45, 4.4], lookAtHeight: 1.1 },
 ] as const satisfies readonly Place[]

@@ -34,14 +34,6 @@ const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
   ArrowRight: [1, 0],
 }
 
-// Controls that put the arrow keys to their own use while focused.
-const usesArrows = (target: EventTarget | null) =>
-  target instanceof HTMLElement && target.matches('input, select, textarea, [contenteditable]')
-
-// Controls that are typed into, or that a letter picks an option in.
-const takesLetters = (target: EventTarget | null) =>
-  usesArrows(target) && !(target instanceof HTMLInputElement && ['radio', 'checkbox', 'range'].includes(target.type))
-
 const eye = new Vector3()
 const normal = new Vector3()
 const gaze = new Quaternion()
@@ -51,12 +43,13 @@ const angles = new Euler(0, 0, 0, 'YXZ')
 function standingAt(place: Place) {
   const dx = place.lookAt[0] - place.position[0]
   const dy = place.lookAt[1] - place.position[1]
+  const eye = eyeHeightOf(place)
   return {
     position: place.position as Vec2,
     yaw: Math.atan2(-dx, -dy),
     /** Height of the eye above the main floor, which follows the floor the body is on. */
-    eye: eyeHeightOf(place),
-    pitch: Math.atan2(place.lookAtHeight - eyeHeightOf(place), Math.hypot(dx, dy)),
+    eye,
+    pitch: Math.atan2(place.lookAtHeight - eye, Math.hypot(dx, dy)),
     /** Where a tap on the floor is leading. */
     goal: null as Vec2 | null,
   }
@@ -68,10 +61,11 @@ function standingAt(place: Place) {
  * walk began, and on to each place it is sent to. Yaw 0 looks north and
  * grows turning left.
  *
- * A mouse looks round while the pointer is locked, which a click on the
- * scene asks for. A finger looks round by dragging, and a tap on the floor
- * walks there. What is within reach to open or shut is kept up to date,
- * and `onToggle` is asked to do it.
+ * Any pointer looks round by dragging. Let go without having moved, a
+ * finger walks to the spot of floor it tapped, and a mouse asks for the
+ * pointer to be locked, after which it looks round just by moving. What is
+ * within reach to open or shut is kept up to date, and `onToggle` is asked
+ * to do it.
  */
 export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onToggle: (id: OperableId) => void }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera
@@ -80,12 +74,9 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
   const { open } = useSceneState()
   const boxes = useMemo(() => obstacles(open), [open])
 
-  const [body] = useState(() => ({ ...standingAt(shot.place), keys: new Set<string>() }))
-
-  // `shot` is a new value each time a place is asked for, the same one included.
-  useEffect(() => {
-    Object.assign(body, standingAt(shot.place))
-  }, [body, shot])
+  // `shot` is a new value each time a place is asked for, the same one
+  // included; `sent` is the one the body was last stood at.
+  const [body] = useState(() => ({ ...standingAt(shot.place), sent: shot, keys: new Set<string>() }))
 
   useEffect(() => {
     let drag: { id: number; x: number; y: number; travel: number } | null = null
@@ -105,8 +96,7 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     }
 
     const onDown = (event: PointerEvent) => {
-      if (event.pointerType === 'mouse') return lockPointer(event)
-      if (drag) return
+      if (drag || event.button !== 0 || isLocked()) return
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY, travel: 0 }
       canvas.setPointerCapture(event.pointerId)
     }
@@ -119,9 +109,11 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     }
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== drag?.id) return
-      const tapped = event.type === 'pointerup' && event.button === 0 && drag.travel < TAP_SLOP
-      if (tapped) body.goal = floorAt(event) ?? body.goal
+      const tapped = event.type === 'pointerup' && drag.travel < TAP_SLOP
       drag = null
+      if (!tapped) return
+      if (event.pointerType === 'mouse') lockPointer(event)
+      else body.goal = floorAt(event) ?? body.goal
     }
     const onMouseMove = (event: MouseEvent) => {
       if (isLocked()) turn(event.movementX, event.movementY, MOUSE_TURN)
@@ -134,15 +126,12 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
       if (event.metaKey || event.ctrlKey || event.altKey) return
       if (event.code === 'KeyE') {
         const within = inReach.get()
-        if (within && !event.repeat && !takesLetters(event.target)) onToggle(within)
+        if (within && !event.repeat) onToggle(within)
         return
       }
       if (!(event.code in keyMoves)) return
-      if (event.code.startsWith('Arrow')) {
-        if (usesArrows(event.target)) return
-        // Keeps the arrow keys from scrolling the row of places.
-        event.preventDefault()
-      }
+      // Keeps the arrow keys from scrolling the row of places.
+      if (event.code.startsWith('Arrow')) event.preventDefault()
       body.keys.add(event.code)
     }
     const onKeyUp = (event: KeyboardEvent) => {
@@ -168,6 +157,7 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
   useEffect(() => () => inReach.set(null), [])
 
   useFrame((_, delta) => {
+    if (body.sent !== shot) Object.assign(body, standingAt(shot.place), { sent: shot })
     const dt = Math.min(delta, 0.1)
     let strafe = 0
     let forward = 0

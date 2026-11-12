@@ -97,6 +97,8 @@ button:focus-visible {
   overflow-x: auto;
   scrollbar-width: none;
   border-radius: 0 999px 999px 0;
+  /* Labels scrolled up to either end fade out rather than being cut. */
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
 }
 
 .bar button {
