@@ -57,6 +57,23 @@ export type Wall = {
   openings: Opening[]
 }
 
+export const wallLength = (wall: Wall) => Math.hypot(wall.to[0] - wall.from[0], wall.to[1] - wall.from[1])
+
+/** The stretches between `start` and `end` that are left once the gaps are taken out. */
+export function spansBetween(gaps: readonly (readonly [number, number])[], start: number, end: number) {
+  const spans: [number, number][] = []
+  let cursor = start
+  for (const [from, to] of gaps.toSorted((a, b) => a[0] - b[0])) {
+    spans.push([cursor, from])
+    cursor = to
+  }
+  spans.push([cursor, end])
+  return spans.filter(([from, to]) => to - from > 1e-6)
+}
+
+/** Opened, the panels of a sliding wall stack where the first one stands, at the `from` end. */
+export const panelWidth = (opening: Extract<Opening, { kind: 'slidingWall' }>) => opening.width / opening.panels
+
 export type Solid = { rect: Rect; height: number; finish: WallFinish }
 
 export const CEILING = 2.4

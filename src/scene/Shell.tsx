@@ -5,13 +5,16 @@ import {
   bounds,
   type FloorFinish,
   type Opening,
+  panelWidth,
   type Rect,
   type Room,
   rooms,
   solids,
+  spansBetween,
   type Vec2,
   type Wall,
   type WallFinish,
+  wallLength,
   walls,
 } from '../plan/plan'
 import { materials, oakFloor } from './materials'
@@ -77,13 +80,12 @@ function Ceiling({ rect, height }: { rect: Rect; height: number }) {
   )
 }
 
-const length = (wall: Wall) => Math.hypot(wall.to[0] - wall.from[0], wall.to[1] - wall.from[1])
 const sillOf = (opening: Opening) => (opening.kind === 'window' ? opening.sill : 0)
 
 function isOn(point: Vec2, wall: Wall) {
   const [ax, ay] = wall.from
   const [bx, by] = wall.to
-  const along = ((point[0] - ax) * (bx - ax) + (point[1] - ay) * (by - ay)) / length(wall) ** 2
+  const along = ((point[0] - ax) * (bx - ax) + (point[1] - ay) * (by - ay)) / wallLength(wall) ** 2
   const off = (point[0] - ax) * (by - ay) - (point[1] - ay) * (bx - ax)
   return Math.abs(off) < 1e-6 && along > -1e-6 && along < 1 + 1e-6
 }
@@ -114,20 +116,17 @@ type Piece = { x0: number; x1: number; y0: number; y1: number }
 
 function solidPieces(wall: Wall): Piece[] {
   const start = -extension(wall.from, wall)
-  const end = length(wall) + extension(wall.to, wall)
-  const pieces: Piece[] = []
-  let cursor = start
-  for (const opening of wall.openings.toSorted((a, b) => a.offset - b.offset)) {
-    const right = opening.offset + opening.width
+  const end = wallLength(wall) + extension(wall.to, wall)
+  const gaps = wall.openings.map((opening) => [opening.offset, opening.offset + opening.width] as const)
+  const pieces: Piece[] = spansBetween(gaps, start, end).map(([x0, x1]) => ({ x0, x1, y0: WALL_BASE, y1: wall.height }))
+  for (const opening of wall.openings) {
+    const x0 = opening.offset
+    const x1 = opening.offset + opening.width
     const sill = sillOf(opening)
-    const head = sill + opening.height
-    pieces.push({ x0: cursor, x1: opening.offset, y0: WALL_BASE, y1: wall.height })
-    pieces.push({ x0: opening.offset, x1: right, y0: WALL_BASE, y1: sill })
-    pieces.push({ x0: opening.offset, x1: right, y0: head, y1: wall.height })
-    cursor = right
+    pieces.push({ x0, x1, y0: WALL_BASE, y1: sill })
+    pieces.push({ x0, x1, y0: sill + opening.height, y1: wall.height })
   }
-  pieces.push({ x0: cursor, x1: end, y0: WALL_BASE, y1: wall.height })
-  return pieces.filter((piece) => piece.x1 - piece.x0 > 1e-6 && piece.y1 - piece.y0 > 1e-6)
+  return pieces.filter((piece) => piece.y1 - piece.y0 > 1e-6)
 }
 
 // Everything below is drawn in the wall's own frame: x runs along the wall
@@ -208,23 +207,23 @@ function SlidingDoor({
 function SlidingWall({ opening }: { opening: Extract<Opening, { kind: 'slidingWall' }> }) {
   const { wallOpen } = useSceneState()
   const group = useRef<Group>(null)
-  const panelWidth = opening.width / opening.panels
+  const width = panelWidth(opening)
   const trackGap = 0.032
 
   useFrame((_, delta) => {
     group.current?.children.forEach((panel, index) => {
-      panel.position.x = MathUtils.damp(panel.position.x, wallOpen ? 0 : index * panelWidth, 5, delta)
+      panel.position.x = MathUtils.damp(panel.position.x, wallOpen ? 0 : index * width, 5, delta)
     })
   })
 
   return (
-    <group ref={group} position={[opening.offset + panelWidth / 2, opening.height / 2, 0]}>
+    <group ref={group} position={[opening.offset + width / 2, opening.height / 2, 0]}>
       {Array.from({ length: opening.panels }, (_, index) => (
-        <group key={index} position={[index * panelWidth, 0, (index - (opening.panels - 1) / 2) * trackGap]}>
-          <Block size={[panelWidth, opening.height, 0.028]} position={[0, 0, 0]} material={materials.panel} />
+        <group key={index} position={[index * width, 0, (index - (opening.panels - 1) / 2) * trackGap]}>
+          <Block size={[width, opening.height, 0.028]} position={[0, 0, 0]} material={materials.panel} />
           <Block
             size={[0.02, opening.height, 0.03]}
-            position={[panelWidth / 2 - 0.01, 0, 0]}
+            position={[width / 2 - 0.01, 0, 0]}
             material={materials.oak}
           />
         </group>
