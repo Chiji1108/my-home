@@ -1,32 +1,23 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useState } from 'react'
-import {
-  Euler,
-  type Material,
-  MathUtils,
-  Mesh,
-  type Object3D,
-  type PerspectiveCamera,
-  Quaternion,
-  Raycaster,
-  Vector2,
-  Vector3,
-} from 'three'
+import { Euler, MathUtils, type PerspectiveCamera, Quaternion, Vector3 } from 'three'
 import { move, obstacles } from '../plan/collision'
 import { type OperableId, operable } from '../plan/interact'
 import type { Vec2 } from '../plan/plan'
-import { type EyeViewpoint, eyeHeightAt, eyeHeightOf } from '../plan/viewpoints'
+import { eyeHeightAt, eyeHeightOf, type Place } from '../plan/places'
+import { isLocked, lockPointer } from '../input'
+import { isSeeThrough, TAP_SLOP, under } from './pointing'
 import { inReach } from './reach'
 import { useSceneState } from './SceneState'
 
 const BODY_RADIUS = 0.2
 /** Metres per second. */
 const SPEED = 1.4
-/** Radians turned by a drag as long as the viewport is tall, as in the room views. */
+/** Radians turned by a drag as long as the viewport is tall. */
 const TURN = 0.4 * Math.PI * 2
+/** Radians turned by a locked mouse for each pixel it moves. */
+const MOUSE_TURN = 0.0022
 const MAX_PITCH = MathUtils.degToRad(70)
-/** Pixels a pointer may travel and still count as a tap. */
-const TAP_SLOP = 6
 /** A tap counts as on the floor up to this height, which takes in the rug. */
 const FLOOR_TOP = 0.05
 /** How quickly the camera catches up with the body, per second. */
@@ -43,77 +34,69 @@ const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
   ArrowRight: [1, 0],
 }
 
-// Controls that put the arrow keys to their own use while focused.
-const usesArrows = (target: EventTarget | null) =>
-  target instanceof HTMLElement && target.matches('input, select, textarea, [contenteditable]')
-
-// Controls that are typed into, or that a letter picks an option in.
-const takesLetters = (target: EventTarget | null) =>
-  usesArrows(target) && !(target instanceof HTMLInputElement && ['radio', 'checkbox', 'range'].includes(target.type))
-
-const isSeeThrough = (object: Object3D) =>
-  object instanceof Mesh && [object.material].flat().every((material: Material) => material.transparent)
-
-const raycaster = new Raycaster()
-const pointer = new Vector2()
 const eye = new Vector3()
 const normal = new Vector3()
 const gaze = new Quaternion()
 const angles = new Euler(0, 0, 0, 'YXZ')
 
+// Where the body is and which way it looks on taking up the walk at a place.
+function standingAt(place: Place) {
+  const dx = place.lookAt[0] - place.position[0]
+  const dy = place.lookAt[1] - place.position[1]
+  const eye = eyeHeightOf(place)
+  return {
+    position: place.position as Vec2,
+    yaw: Math.atan2(-dx, -dy),
+    /** Height of the eye above the main floor, which follows the floor the body is on. */
+    eye,
+    pitch: Math.atan2(place.lookAtHeight - eye, Math.hypot(dx, dy)),
+    /** Where a tap on the floor is leading. */
+    goal: null as Vec2 | null,
+  }
+}
+
 /**
  * First-person walking. The body is a point on the plan with a heading; the
  * camera follows it, which also carries it in from wherever it was when the
- * walk began. Yaw 0 looks north and grows turning left. What is within
- * reach to open or shut is kept up to date, and `onToggle` is asked to do it.
+ * walk began, and on to each place it is sent to. Yaw 0 looks north and
+ * grows turning left.
+ *
+ * Any pointer looks round by dragging. Let go without having moved, a
+ * finger walks to the spot of floor it tapped, and a mouse asks for the
+ * pointer to be locked, after which it looks round just by moving. What is
+ * within reach to open or shut is kept up to date, and `onToggle` is asked
+ * to do it.
  */
-export function WalkControls({ start, onToggle }: { start: EyeViewpoint; onToggle: (id: OperableId) => void }) {
+export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onToggle: (id: OperableId) => void }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera
   const scene = useThree((state) => state.scene)
   const canvas = useThree((state) => state.gl.domElement)
   const { open } = useSceneState()
   const boxes = useMemo(() => obstacles(open), [open])
 
-  const [body] = useState(() => {
-    const dx = start.lookAt[0] - start.position[0]
-    const dy = start.lookAt[1] - start.position[1]
-    return {
-      position: start.position as Vec2,
-      yaw: Math.atan2(-dx, -dy),
-      /** Height of the eye above the main floor, which follows the floor the body is on. */
-      eye: eyeHeightOf(start),
-      pitch: Math.atan2(start.lookAtHeight - eyeHeightOf(start), Math.hypot(dx, dy)),
-      /** Where a tap on the floor is leading. */
-      goal: null as Vec2 | null,
-      keys: new Set<string>(),
-    }
-  })
-
-  useEffect(() => {
-    camera.zoom = 1
-    camera.updateProjectionMatrix()
-  }, [camera])
+  // `shot` is a new value each time a place is asked for, the same one
+  // included; `sent` is the one the body was last stood at.
+  const [body] = useState(() => ({ ...standingAt(shot.place), sent: shot, keys: new Set<string>() }))
 
   useEffect(() => {
     let drag: { id: number; x: number; y: number; travel: number } | null = null
 
     const floorAt = (event: PointerEvent): Vec2 | null => {
-      const rect = canvas.getBoundingClientRect()
-      pointer.set(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        1 - ((event.clientY - rect.top) / rect.height) * 2,
-      )
-      raycaster.setFromCamera(pointer, camera)
       // Glass is looked through, so the floor beyond a pane can be tapped.
-      const hit = raycaster.intersectObjects(scene.children).find(({ object }) => !isSeeThrough(object))
+      const hit = under(event, canvas, camera, scene).find(({ object }) => !isSeeThrough(object))
       if (!hit?.face || hit.point.y > FLOOR_TOP) return null
       // Facing up, so not the foot of a wall or of a piece of furniture.
       const facesUp = normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y > 0.9
       return facesUp ? [hit.point.x, hit.point.z] : null
     }
 
+    const turn = (dx: number, dy: number, perPixel: number) => {
+      body.yaw -= dx * perPixel
+      body.pitch = MathUtils.clamp(body.pitch - dy * perPixel, -MAX_PITCH, MAX_PITCH)
+    }
+
     const onDown = (event: PointerEvent) => {
-      if (drag) return
+      if (drag || event.button !== 0 || isLocked()) return
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY, travel: 0 }
       canvas.setPointerCapture(event.pointerId)
     }
@@ -121,33 +104,34 @@ export function WalkControls({ start, onToggle }: { start: EyeViewpoint; onToggl
       if (event.pointerId !== drag?.id) return
       const dx = event.clientX - drag.x
       const dy = event.clientY - drag.y
-      const turn = TURN / canvas.clientHeight
-      body.yaw -= dx * turn
-      body.pitch = MathUtils.clamp(body.pitch - dy * turn, -MAX_PITCH, MAX_PITCH)
+      turn(dx, dy, TURN / canvas.clientHeight)
       drag = { id: drag.id, x: event.clientX, y: event.clientY, travel: drag.travel + Math.hypot(dx, dy) }
     }
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== drag?.id) return
-      const tapped = event.type === 'pointerup' && event.button === 0 && drag.travel < TAP_SLOP
-      if (tapped) body.goal = floorAt(event) ?? body.goal
+      const tapped = event.type === 'pointerup' && drag.travel < TAP_SLOP
       drag = null
+      if (!tapped) return
+      if (event.pointerType === 'mouse') lockPointer(event)
+      else body.goal = floorAt(event) ?? body.goal
     }
-    // While Meta is held the other keys never report being let go.
+    const onMouseMove = (event: MouseEvent) => {
+      if (isLocked()) turn(event.movementX, event.movementY, MOUSE_TURN)
+    }
+    // While Meta is held the other keys never report being let go, nor do
+    // they once the page has lost the keyboard or the pointer its lock.
     const release = () => body.keys.clear()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Meta') return release()
       if (event.metaKey || event.ctrlKey || event.altKey) return
       if (event.code === 'KeyE') {
         const within = inReach.get()
-        if (within && !event.repeat && !takesLetters(event.target)) onToggle(within)
+        if (within && !event.repeat) onToggle(within)
         return
       }
       if (!(event.code in keyMoves)) return
-      if (event.code.startsWith('Arrow')) {
-        if (usesArrows(event.target)) return
-        // Keeps the arrow keys from scrolling the row of viewpoints.
-        event.preventDefault()
-      }
+      // Keeps the arrow keys from scrolling the row of places.
+      if (event.code.startsWith('Arrow')) event.preventDefault()
       body.keys.add(event.code)
     }
     const onKeyUp = (event: KeyboardEvent) => {
@@ -164,6 +148,8 @@ export function WalkControls({ start, onToggle }: { start: EyeViewpoint; onToggl
     window.addEventListener('keydown', onKeyDown, { signal })
     window.addEventListener('keyup', onKeyUp, { signal })
     window.addEventListener('blur', release, { signal })
+    document.addEventListener('mousemove', onMouseMove, { signal })
+    document.addEventListener('pointerlockchange', release, { signal })
     return () => listening.abort()
   }, [body, camera, scene, canvas, onToggle])
 
@@ -171,6 +157,7 @@ export function WalkControls({ start, onToggle }: { start: EyeViewpoint; onToggl
   useEffect(() => () => inReach.set(null), [])
 
   useFrame((_, delta) => {
+    if (body.sent !== shot) Object.assign(body, standingAt(shot.place), { sent: shot })
     const dt = Math.min(delta, 0.1)
     let strafe = 0
     let forward = 0

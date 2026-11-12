@@ -23,6 +23,7 @@ import {
 } from '../plan/plan'
 import { materials, oakFloor } from './materials'
 import { Block } from './parts'
+import { operableAs } from './pointing'
 import { useShadowsDirty } from './shadows'
 import { PLANK_TILE } from './textures'
 import { useTravel } from './useTravel'
@@ -348,7 +349,9 @@ function WallView({ wall }: { wall: Wall }) {
         </mesh>
       ))}
       {wall.openings.map((opening) => (
-        <OpeningView key={opening.offset} opening={opening} thickness={wall.thickness} />
+        <group key={opening.offset} userData={'id' in opening ? operableAs(opening.id) : {}}>
+          <OpeningView opening={opening} thickness={wall.thickness} />
+        </group>
       ))}
     </group>
   )

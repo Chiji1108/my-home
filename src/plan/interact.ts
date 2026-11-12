@@ -36,6 +36,9 @@ const operables: Operable[] = [
   ...cabinets.map((item) => ({ id: furnitureId(item), box: footprint(item), frontOnly: true, shuts: false })),
 ]
 
+/** Whether the thing is one that can be worked at all. */
+export const works = (id: OperableId) => operables.some((candidate) => candidate.id === id)
+
 /**
  * What is being looked at, within reach: the nearest of the things that
  * can be worked whose face the gaze meets before it meets anything else

@@ -28,12 +28,7 @@ canvas {
 
 .overlay {
   position: fixed;
-  inset: auto 0 0 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px calc(14px + env(safe-area-inset-bottom));
+  inset: 0;
   pointer-events: none;
 }
 
@@ -46,11 +41,14 @@ canvas {
   --hairline: rgb(241 236 226 / 0.14);
 }
 
-.toggles {
+.dock {
+  position: absolute;
+  inset: auto 0 0 0;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
+  padding: 0 12px calc(14px + env(safe-area-inset-bottom));
 }
 
 .pill {
@@ -65,18 +63,46 @@ canvas {
   background: var(--surface);
   backdrop-filter: blur(14px) saturate(1.2);
   box-shadow: 0 6px 24px rgb(0 0 0 / 0.08);
+  color: var(--ink);
+  font: inherit;
   pointer-events: auto;
   box-sizing: border-box;
 }
 
-.views {
-  overflow-x: auto;
-  scrollbar-width: none;
+button {
+  cursor: pointer;
 }
 
-.pill button,
-.toggle span {
-  display: block;
+button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+/* One bar: how the unit is seen, then where a walk can be taken up. Only the places scroll. */
+.modes,
+.places {
+  display: flex;
+  gap: 2px;
+}
+
+.modes {
+  flex: none;
+  padding-right: 6px;
+  border-right: 1px solid var(--hairline);
+}
+
+.places {
+  min-width: 0;
+  padding-left: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-radius: 0 999px 999px 0;
+  /* Labels scrolled up to either end fade out rather than being cut. */
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
+
+.bar button {
+  flex: none;
   padding: 7px 13px;
   border: 0;
   border-radius: 999px;
@@ -87,37 +113,30 @@ canvas {
   letter-spacing: 0.04em;
   line-height: 1.2;
   white-space: nowrap;
-  cursor: pointer;
   transition:
     background-color 0.2s,
     color 0.2s;
 }
 
-.pill button[aria-pressed='true'],
-.toggle input:checked + span {
+.places button:hover {
+  color: var(--ink);
+}
+
+.bar button[aria-pressed='true'] {
   background: var(--surface-active);
   color: var(--on-active);
 }
 
-.pill button:focus-visible,
-.toggle input:focus-visible + span {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-
-.toggle legend {
-  float: left;
-  padding: 0 6px 0 11px;
-  color: var(--ink-soft);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-}
-
-.toggle input {
+.night {
   position: absolute;
-  opacity: 0;
-  pointer-events: none;
+  top: calc(14px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+  padding: 9px;
+  color: var(--ink-soft);
+}
+
+.night svg {
+  display: block;
 }
 
 .hint {
@@ -131,20 +150,37 @@ canvas {
   white-space: nowrap;
 }
 
+/* What a click on the scene will do, said where the click will land. */
+.prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 26px;
+  border-radius: 18px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.prompt strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.prompt span {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
 .interact {
   gap: 8px;
   padding: 9px 18px;
-  color: var(--ink);
-  font: inherit;
   font-size: 14px;
   letter-spacing: 0.06em;
   line-height: 1.2;
-  cursor: pointer;
-}
-
-.interact:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
 }
 
 .interact kbd {
@@ -158,8 +194,26 @@ canvas {
   box-sizing: border-box;
 }
 
-@media (pointer: coarse) {
-  .keys {
-    display: none;
-  }
+/* The middle of the screen, which is where a locked pointer aims. */
+.aim {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  transform: translate(-50%, -3px);
+}
+
+.aim .interact {
+  pointer-events: none;
+}
+
+.crosshair {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
 }
