@@ -16,12 +16,14 @@ const SPEED = 1.4
 /** Radians turned by a drag as long as the viewport is tall. */
 const TURN = 0.4 * Math.PI * 2
 /** Radians turned by a locked mouse for each pixel it moves. */
-const MOUSE_TURN = 0.0022
+const MOUSE_TURN = 0.002
 const MAX_PITCH = MathUtils.degToRad(70)
 /** A tap counts as on the floor up to this height, which takes in the rug. */
 const FLOOR_TOP = 0.05
-/** How quickly the camera catches up with the body, per second. */
+/** How quickly the camera makes up a jump of the body's, per second. */
 const EASE = 12
+/** What is left of a jump is dropped once it is this small, in metres and in radians. */
+const SETTLED = 1e-3
 
 const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
   KeyW: [0, 1],
@@ -37,6 +39,7 @@ const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
 const eye = new Vector3()
 const normal = new Vector3()
 const gaze = new Quaternion()
+const level = new Quaternion()
 const angles = new Euler(0, 0, 0, 'YXZ')
 
 // Where the body is and which way it looks on taking up the walk at a place.
@@ -56,10 +59,12 @@ function standingAt(place: Place) {
 }
 
 /**
- * First-person walking. The body is a point on the plan with a heading; the
- * camera follows it, which also carries it in from wherever it was when the
- * walk began, and on to each place it is sent to. Yaw 0 looks north and
- * grows turning left.
+ * First-person walking. The body is a point on the plan with a heading,
+ * and the camera is where its eye is: it turns and moves with the body in
+ * the same frame, with nothing to catch up. Only a jump is eased, and
+ * apart from that: being sent to a place, which carries the camera in from
+ * wherever it was, and a step up or down between floors. Yaw 0 looks north
+ * and grows turning left.
  *
  * Any pointer looks round by dragging. Let go without having moved, a
  * finger walks to the spot of floor it tapped, and a mouse asks for the
@@ -76,7 +81,15 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
 
   // `shot` is a new value each time a place is asked for, the same one
   // included; `sent` is the one the body was last stood at.
-  const [body] = useState(() => ({ ...standingAt(shot.place), sent: shot, keys: new Set<string>() }))
+  const [body] = useState(() => ({
+    ...standingAt(shot.place),
+    /** The shot the body was last stood at; none until the first frame, which stands it at this one. */
+    sent: null as object | null,
+    keys: new Set<string>(),
+    /** What is left of a jump: how far the camera still is from the eye, and how far turned from its gaze. */
+    lag: new Vector3(),
+    skew: new Quaternion(),
+  }))
 
   useEffect(() => {
     let drag: { id: number; x: number; y: number; travel: number } | null = null
@@ -157,7 +170,8 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
   useEffect(() => () => inReach.set(null), [])
 
   useFrame((_, delta) => {
-    if (body.sent !== shot) Object.assign(body, standingAt(shot.place), { sent: shot })
+    const arriving = body.sent !== shot
+    if (arriving) Object.assign(body, standingAt(shot.place), { sent: shot })
     const dt = Math.min(delta, 0.1)
     let strafe = 0
     let forward = 0
@@ -194,10 +208,27 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     const heading: Vec2 = [-Math.sin(body.yaw), -Math.cos(body.yaw)]
     inReach.set(operable(next, heading, BODY_RADIUS, open, boxes))
 
-    const ease = 1 - Math.exp(-EASE * dt)
-    body.eye = eyeHeightAt(next) ?? body.eye
-    camera.position.lerp(eye.set(next[0], body.eye, next[1]), ease)
-    camera.quaternion.slerp(gaze.setFromEuler(angles.set(body.pitch, body.yaw, 0)), ease)
+    const height = eyeHeightAt(next) ?? body.eye
+    eye.set(next[0], height, next[1])
+    gaze.setFromEuler(angles.set(body.pitch, body.yaw, 0))
+
+    const { lag, skew } = body
+    if (arriving) {
+      // Sent somewhere: the whole of the way from where the camera is.
+      lag.copy(camera.position).sub(eye)
+      skew.copy(gaze).invert().premultiply(camera.quaternion)
+    } else {
+      const left = Math.exp(-EASE * dt)
+      // A step between floors is a jump of the eye's height.
+      lag.y += body.eye - height
+      lag.multiplyScalar(left)
+      if (lag.length() < SETTLED) lag.set(0, 0, 0)
+      skew.slerp(level, 1 - left)
+      if (skew.angleTo(level) < SETTLED) skew.identity()
+    }
+    body.eye = height
+    camera.position.copy(eye).add(lag)
+    camera.quaternion.copy(skew).multiply(gaze)
   })
 
   return null

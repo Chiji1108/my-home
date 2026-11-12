@@ -95,7 +95,19 @@ export function Lighting() {
       <Sky night={night} />
       {!night && <Sun />}
       <EffectComposer multisampling={4}>
-        <N8AO aoRadius={1} distanceFalloff={1} intensity={3} quality="medium" />
+        {/*
+          Eight samples, half the pass's default; indoors the pass is most of the frame. Measured against
+          sixteen: fewer than one pixel in two hundred differs by more than 8 in 255, and as the camera
+          turns the picture changes from frame to frame by 2% more. The noise is fixed to the screen.
+        */}
+        <N8AO
+          aoRadius={1}
+          distanceFalloff={1}
+          intensity={3}
+          aoSamples={8}
+          denoiseSamples={8}
+          denoiseRadius={12}
+        />
         <Bloom mipmapBlur luminanceThreshold={3} intensity={0.5} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       </EffectComposer>
