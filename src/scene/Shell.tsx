@@ -22,6 +22,7 @@ import {
 import { materials, oakFloor } from './materials'
 import { Block } from './parts'
 import { useSceneState } from './SceneState'
+import { useShadowsDirty } from './shadows'
 import { PLANK_TILE } from './textures'
 
 const FLOOR_THICKNESS = 0.2
@@ -29,7 +30,7 @@ const CEILING_THICKNESS = 0.1
 const FRAME = 0.04
 /** Width of the oak stile on the leading edge of a sliding wall panel. */
 const STILE = 0.02
-/** A sliding panel this close to where it is going has arrived. */
+/** A sliding panel this close to where it is going is put there. */
 const AT_REST = 1e-4
 
 const floorMaterial: Record<FloorFinish, Material> = {
@@ -118,24 +119,37 @@ function extension(point: Vec2, wall: Wall) {
 // that sits below the main floor.
 const WALL_BASE = Math.min(...rooms.map((room) => room.level))
 
-type Piece = { x0: number; x1: number; y0: number; y1: number }
+/** Whether there is a floor at the point that is level with `height` or above it. */
+const reaches = (point: Vec2, height: number) => (floorLevelAt(point) ?? -Infinity) >= height
+
+/** A box of wall in the wall's own frame, as laid out below. */
+type Piece = { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number }
 
 function solidPieces(wall: Wall): Piece[] {
   const start = -extension(wall.from, wall)
   const end = wallLength(wall) + extension(wall.to, wall)
+  const half = wall.thickness / 2
   const gaps = wall.openings.map((opening) => [opening.offset, opening.offset + opening.width] as const)
-  const pieces: Piece[] = spansBetween(gaps, start, end).map(([x0, x1]) => ({ x0, x1, y0: WALL_BASE, y1: wall.height }))
+  const pieces: Piece[] = spansBetween(gaps, start, end).map(([x0, x1]) => ({
+    x0,
+    x1,
+    y0: WALL_BASE,
+    y1: wall.height,
+    z0: -half,
+    z1: half,
+  }))
   for (const opening of wall.openings) {
     const x0 = opening.offset
     const x1 = opening.offset + opening.width
     const sill = sillOf(opening)
-    // The floor runs through an opening that reaches down to it. A piece of
-    // wall there would have its top in the plane of the floor.
-    const floor = Math.max(...besideOpening(wall, opening).map((point) => floorLevelAt(point) ?? -Infinity))
-    if (sill > floor) pieces.push({ x0, x1, y0: WALL_BASE, y1: sill })
-    pieces.push({ x0, x1, y0: sill + opening.height, y1: wall.height })
+    // A floor that is level with the sill runs in under the opening as far
+    // as the wall's centreline, so the wall below the sill is left out on
+    // that side: its top would lie in the plane of the floor.
+    const [left, right] = besideOpening(wall, opening)
+    pieces.push({ x0, x1, y0: WALL_BASE, y1: sill, z0: reaches(left, sill) ? 0 : -half, z1: reaches(right, sill) ? 0 : half })
+    pieces.push({ x0, x1, y0: sill + opening.height, y1: wall.height, z0: -half, z1: half })
   }
-  return pieces.filter((piece) => piece.y1 - piece.y0 > 1e-6)
+  return pieces.filter((piece) => piece.y1 - piece.y0 > 1e-6 && piece.z1 - piece.z0 > 1e-6)
 }
 
 // Everything below is drawn in the wall's own frame: x runs along the wall
@@ -216,15 +230,17 @@ function SlidingDoor({
 function SlidingWall({ opening }: { opening: Extract<Opening, { kind: 'slidingWall' }> }) {
   const { wallOpen } = useSceneState()
   const group = useRef<Group>(null)
+  const shadowsDirty = useShadowsDirty()
   const width = panelWidth(opening)
   const trackGap = 0.032
 
-  useFrame(({ gl }, delta) => {
+  useFrame((_, delta) => {
     group.current?.children.forEach((panel, index) => {
       const rest = wallOpen ? 0 : index * width
-      if (Math.abs(panel.position.x - rest) < AT_REST) return
-      panel.position.x = MathUtils.damp(panel.position.x, rest, 5, delta)
-      gl.shadowMap.needsUpdate = true
+      if (panel.position.x === rest) return
+      const next = MathUtils.damp(panel.position.x, rest, 5, delta)
+      panel.position.x = Math.abs(next - rest) < AT_REST ? rest : next
+      shadowsDirty()
     })
   })
 
@@ -273,10 +289,10 @@ function WallView({ wall }: { wall: Wall }) {
           key={`${piece.x0}:${piece.y0}`}
           castShadow={opaque}
           receiveShadow={opaque}
-          position={[(piece.x0 + piece.x1) / 2, (piece.y0 + piece.y1) / 2, 0]}
+          position={[(piece.x0 + piece.x1) / 2, (piece.y0 + piece.y1) / 2, (piece.z0 + piece.z1) / 2]}
           material={wallMaterial[wall.finish]}
         >
-          <boxGeometry args={[piece.x1 - piece.x0, piece.y1 - piece.y0, wall.thickness]} />
+          <boxGeometry args={[piece.x1 - piece.x0, piece.y1 - piece.y0, piece.z1 - piece.z0]} />
         </mesh>
       ))}
       {wall.openings.map((opening) => (
@@ -288,15 +304,16 @@ function WallView({ wall }: { wall: Wall }) {
 
 export function Shell() {
   const ceilings = useRef<Group>(null)
+  const shadowsDirty = useShadowsDirty()
 
   // Ceilings are lifted off while the camera is above them, so that it
   // can look down into the rooms.
-  useFrame(({ camera, gl }) => {
+  useFrame(({ camera }) => {
     const group = ceilings.current
     const visible = camera.position.y < bounds.height
     if (!group || group.visible === visible) return
     group.visible = visible
-    gl.shadowMap.needsUpdate = true
+    shadowsDirty()
   })
 
   return (

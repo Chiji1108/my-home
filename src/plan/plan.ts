@@ -71,15 +71,20 @@ export function spansBetween(gaps: readonly (readonly [number, number])[], start
   return spans.filter(([from, to]) => to - from > 1e-6)
 }
 
-/** The points just clear of either face of the wall, at the middle of an opening. */
-export function besideOpening(wall: Wall, opening: Opening): [Vec2, Vec2] {
+/** Unit vector along the wall, from `from` to `to`. */
+export function wallAxis(wall: Wall): Vec2 {
   const length = wallLength(wall)
-  const along: Vec2 = [(wall.to[0] - wall.from[0]) / length, (wall.to[1] - wall.from[1]) / length]
+  return [(wall.to[0] - wall.from[0]) / length, (wall.to[1] - wall.from[1]) / length]
+}
+
+/** The points just clear of the wall's left and right faces, at the middle of an opening. */
+export function besideOpening(wall: Wall, opening: Opening): [left: Vec2, right: Vec2] {
+  const axis = wallAxis(wall)
   const middle = opening.offset + opening.width / 2
   const reach = wall.thickness / 2 + 0.05
   const beside = (side: -1 | 1): Vec2 => [
-    wall.from[0] + along[0] * middle - side * along[1] * reach,
-    wall.from[1] + along[1] * middle + side * along[0] * reach,
+    wall.from[0] + axis[0] * middle - side * axis[1] * reach,
+    wall.from[1] + axis[1] * middle + side * axis[0] * reach,
   ]
   return [beside(-1), beside(1)]
 }

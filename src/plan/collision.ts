@@ -12,6 +12,7 @@ import {
   spansBetween,
   type Vec2,
   type Wall,
+  wallAxis,
   wallLength,
   walls,
 } from './plan'
@@ -45,10 +46,9 @@ function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] 
 }
 
 function wallBoxes(wall: Wall, wallOpen: boolean): Box[] {
-  const length = wallLength(wall)
-  const axis: Vec2 = [(wall.to[0] - wall.from[0]) / length, (wall.to[1] - wall.from[1]) / length]
+  const axis = wallAxis(wall)
   const gaps = wall.openings.map((opening) => gap(opening, wall, wallOpen)).filter((found) => found !== null)
-  return spansBetween(gaps, 0, length).map(([start, end]) => {
+  return spansBetween(gaps, 0, wallLength(wall)).map(([start, end]) => {
     const middle = (start + end) / 2
     return {
       centre: [wall.from[0] + axis[0] * middle, wall.from[1] + axis[1] * middle],

@@ -1,5 +1,4 @@
 import { Environment, Lightformer } from '@react-three/drei'
-import { useThree } from '@react-three/fiber'
 import { Bloom, EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { useLayoutEffect, useRef } from 'react'
@@ -7,6 +6,7 @@ import type { DirectionalLight } from 'three'
 import { light } from '../plan/palette'
 import { bounds } from '../plan/plan'
 import { useSceneState } from './SceneState'
+import { useShadowsDirty, useStaticShadows } from './shadows'
 
 const centre = [(bounds.x0 + bounds.x1) / 2, 0, (bounds.y0 + bounds.y1) / 2] as const
 
@@ -84,15 +84,10 @@ function Sky({ night }: { night: boolean }) {
 
 export function Lighting() {
   const { night } = useSceneState()
-  const shadowMap = useThree((state) => state.gl.shadowMap)
-
-  // Nothing that casts a shadow moves from frame to frame, so the shadow
-  // maps are drawn again only when something changes: here the set of
-  // lights, in the shell the sliding wall and the ceilings.
-  useLayoutEffect(() => {
-    shadowMap.autoUpdate = false
-    shadowMap.needsUpdate = true
-  }, [shadowMap, night])
+  const shadowsDirty = useShadowsDirty()
+  useStaticShadows()
+  // The evening swaps the sun for the lamps.
+  useLayoutEffect(shadowsDirty, [shadowsDirty, night])
 
   return (
     <>
