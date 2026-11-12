@@ -54,17 +54,6 @@ function BookRow({ width, top, clear, depth, seed }: { width: number; top: numbe
   return <>{books}</>
 }
 
-export function Bookshelf({ size }: PieceProps) {
-  const [w, d] = size
-  return (
-    <Shelving
-      size={size}
-      levels={5}
-      fill={(level, top, clear) => <BookRow width={w - 0.08} top={top} clear={clear} depth={d} seed={level} />}
-    />
-  )
-}
-
 export function DisplayShelf({ size }: PieceProps) {
   const [w, d] = size
   const displays: ReactNode[] = [

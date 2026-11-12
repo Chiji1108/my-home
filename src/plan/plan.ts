@@ -14,7 +14,7 @@ export type RoomId =
   | 'bedroom'
   | 'entrance'
   | 'corridor'
-  | 'study'
+  | 'hobby'
   | 'wicNorth'
   | 'toilet'
   | 'bath'
@@ -80,7 +80,7 @@ export const rooms: Room[] = [
   // The entrance includes the shoe-cabinet notch on its east side.
   room('entrance', '玄関', [rect(2.67, 0, 3.78, 1.0), rect(3.78, 0, 4.2, 1.1)], 'tile', -0.08),
   room('corridor', '廊下', [rect(2.67, 1.0, 3.78, 4.4)]),
-  room('study', '洋室(3)', [rect(4.2, 0, 6, 3.65), rect(3.78, 1.1, 4.2, 3.65)]),
+  room('hobby', '洋室(3)', [rect(4.2, 0, 6, 3.65), rect(3.78, 1.1, 4.2, 3.65)]),
   room('wicNorth', 'ウォークインクロゼット', [rect(0, 3.65, 1.7, 4.55)]),
   room('toilet', 'トイレ', [rect(1.7, 3.65, 2.67, 4.9)], 'tile'),
   room('bath', '浴室', [rect(0, 4.55, 1.7, 6.5)], 'bathTile'),
@@ -150,7 +150,7 @@ export const walls: Wall[] = [
     ],
   ),
 
-  // Study, with the shoe-cabinet notch taken out of its north-west corner
+  // Hobby room, with the shoe-cabinet notch taken out of its north-west corner
   wall([4.2, 0], [4.2, 1.1]),
   wall([3.78, 1.1], [4.2, 1.1]),
   wall(

@@ -65,15 +65,14 @@ export function WorkDesk({ size }: PieceProps) {
   )
 }
 
-export function StudyDesk({ size }: PieceProps) {
+// A gaming and film-watching setup: one display and a console standing beside it.
+export function HobbyDesk({ size }: PieceProps) {
   const [w, d, h] = size
   return (
     <group>
       <DeskBase size={size} />
-      <Block size={[0.31, 0.012, 0.215]} position={[0, h + 0.006, 0.05]} material={materials.aluminium} />
-      <Block size={[0.31, 0.215, 0.008]} position={[0, h + 0.11, -0.085]} rotation={[-0.3, 0, 0]} material={materials.aluminium} />
-      <Block size={[0.22, 0.05, 0.16]} position={[-w / 2 + 0.2, h + 0.025, -0.05]} material={materials.terracotta} />
-      <Block size={[0.2, 0.03, 0.15]} position={[-w / 2 + 0.2, h + 0.065, -0.05]} material={materials.linen} rotation={[0, 0.25, 0]} />
+      <StudioDisplay position={[0, h, -d / 2 + 0.2]} />
+      <Soft size={[0.04, 0.26, 0.1]} position={[-w / 2 + 0.16, h + 0.13, -d / 2 + 0.2]} material={materials.linen} radius={0.012} />
       <DeskLamp position={[w / 2 - 0.16, h, -d / 2 + 0.16]} />
     </group>
   )

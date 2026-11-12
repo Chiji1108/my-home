@@ -5,10 +5,11 @@ export type FurnitureKind =
   | 'bedsideTable'
   | 'rug'
   | 'workDesk'
-  | 'studyDesk'
+  | 'hobbyDesk'
   | 'workChair'
+  | 'piano'
+  | 'pianoBench'
   | 'displayShelf'
-  | 'bookshelf'
   | 'closet'
   | 'shoeCabinet'
   | 'sideboard'
@@ -67,12 +68,13 @@ export const furniture: Furniture[] = [
   item('bedsideTable', 'bedroom', [0.31, 2.97], EAST, [0.36, 0.4, 0.45]),
   item('clothesRack', 'wicNorth', [0.87, 4.3], NORTH, [1.5, 0.38, 1.8]),
 
-  // 洋室(3): study
-  item('studyDesk', 'study', [5.0, 0.41], SOUTH, [1.2, 0.6, 0.72]),
-  item('workChair', 'study', [5.0, 1.0], NORTH, [0.6, 0.6, 0.92]),
-  item('bookshelf', 'study', [5.75, 2.5], WEST, [1.4, 0.3, 1.8]),
-  item('closet', 'study', [4.29, 3.12], NORTH, [0.92, 0.95, 2.4]),
-  item('downlight', 'study', [4.9, 1.8], SOUTH, [0.1, 0.1, 2.3]),
+  // 洋室(3): hobby room for games, films and the piano
+  item('hobbyDesk', 'hobby', [5.0, 0.41], SOUTH, [1.2, 0.6, 0.72]),
+  item('workChair', 'hobby', [5.0, 1.0], NORTH, [0.6, 0.6, 0.92]),
+  item('piano', 'hobby', [5.725, 2.5], WEST, [1.35, 0.35, 0.78]),
+  item('pianoBench', 'hobby', [5.2, 2.5], WEST, [0.55, 0.32, 0.48]),
+  item('closet', 'hobby', [4.29, 3.12], NORTH, [0.92, 0.95, 2.4]),
+  item('downlight', 'hobby', [4.9, 1.8], SOUTH, [0.1, 0.1, 2.3]),
 
   // Entrance and corridor
   item('shoeCabinet', 'entrance', [3.99, 0.6], WEST, [1.0, 0.4, 2.2]),
