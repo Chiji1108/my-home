@@ -83,10 +83,9 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
   // included; `sent` is the one the body was last stood at.
   const [body] = useState(() => ({
     ...standingAt(shot.place),
-    sent: shot,
+    /** The shot the body was last stood at; none until the first frame, which stands it at this one. */
+    sent: null as object | null,
     keys: new Set<string>(),
-    /** Whether the body has just been put somewhere, the camera not yet having been told. */
-    arrived: true,
     /** What is left of a jump: how far the camera still is from the eye, and how far turned from its gaze. */
     lag: new Vector3(),
     skew: new Quaternion(),
@@ -171,7 +170,8 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
   useEffect(() => () => inReach.set(null), [])
 
   useFrame((_, delta) => {
-    if (body.sent !== shot) Object.assign(body, standingAt(shot.place), { sent: shot, arrived: true })
+    const arriving = body.sent !== shot
+    if (arriving) Object.assign(body, standingAt(shot.place), { sent: shot })
     const dt = Math.min(delta, 0.1)
     let strafe = 0
     let forward = 0
@@ -208,24 +208,25 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     const heading: Vec2 = [-Math.sin(body.yaw), -Math.cos(body.yaw)]
     inReach.set(operable(next, heading, BODY_RADIUS, open, boxes))
 
-    // A step between floors is a jump of the eye's height.
     const height = eyeHeightAt(next) ?? body.eye
-    body.lag.y += body.eye - height
-    body.eye = height
     eye.set(next[0], height, next[1])
     gaze.setFromEuler(angles.set(body.pitch, body.yaw, 0))
 
     const { lag, skew } = body
-    if (body.arrived) {
-      body.arrived = false
+    if (arriving) {
+      // Sent somewhere: the whole of the way from where the camera is.
       lag.copy(camera.position).sub(eye)
       skew.copy(gaze).invert().premultiply(camera.quaternion)
     } else {
-      lag.multiplyScalar(Math.exp(-EASE * dt))
+      const left = Math.exp(-EASE * dt)
+      // A step between floors is a jump of the eye's height.
+      lag.y += body.eye - height
+      lag.multiplyScalar(left)
       if (lag.length() < SETTLED) lag.set(0, 0, 0)
-      skew.slerp(level, 1 - Math.exp(-EASE * dt))
+      skew.slerp(level, 1 - left)
       if (skew.angleTo(level) < SETTLED) skew.identity()
     }
+    body.eye = height
     camera.position.copy(eye).add(lag)
     camera.quaternion.copy(skew).multiply(gaze)
   })
