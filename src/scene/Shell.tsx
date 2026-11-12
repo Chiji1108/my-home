@@ -29,6 +29,8 @@ const CEILING_THICKNESS = 0.1
 const FRAME = 0.04
 /** Width of the oak stile on the leading edge of a sliding wall panel. */
 const STILE = 0.02
+/** A sliding panel this close to where it is going has arrived. */
+const AT_REST = 1e-4
 
 const floorMaterial: Record<FloorFinish, Material> = {
   oak: oakFloor,
@@ -217,9 +219,12 @@ function SlidingWall({ opening }: { opening: Extract<Opening, { kind: 'slidingWa
   const width = panelWidth(opening)
   const trackGap = 0.032
 
-  useFrame((_, delta) => {
+  useFrame(({ gl }, delta) => {
     group.current?.children.forEach((panel, index) => {
-      panel.position.x = MathUtils.damp(panel.position.x, wallOpen ? 0 : index * width, 5, delta)
+      const rest = wallOpen ? 0 : index * width
+      if (Math.abs(panel.position.x - rest) < AT_REST) return
+      panel.position.x = MathUtils.damp(panel.position.x, rest, 5, delta)
+      gl.shadowMap.needsUpdate = true
     })
   })
 
@@ -286,8 +291,12 @@ export function Shell() {
 
   // Ceilings are lifted off while the camera is above them, so that it
   // can look down into the rooms.
-  useFrame(({ camera }) => {
-    if (ceilings.current) ceilings.current.visible = camera.position.y < bounds.height
+  useFrame(({ camera, gl }) => {
+    const group = ceilings.current
+    const visible = camera.position.y < bounds.height
+    if (!group || group.visible === visible) return
+    group.visible = visible
+    gl.shadowMap.needsUpdate = true
   })
 
   return (
