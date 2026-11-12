@@ -3,6 +3,8 @@ import { type Viewpoint, viewpoints } from '../plan/viewpoints'
 type Props = {
   view: Viewpoint
   onView: (view: Viewpoint) => void
+  walking: boolean
+  onWalk: () => void
   night: boolean
   onNight: (night: boolean) => void
   wallOpen: boolean
@@ -38,9 +40,14 @@ function Toggle<T extends string>({
   )
 }
 
-export function Overlay({ view, onView, night, onNight, wallOpen, onWallOpen }: Props) {
+export function Overlay({ view, onView, walking, onWalk, night, onNight, wallOpen, onWallOpen }: Props) {
   return (
     <div className="overlay" data-night={night}>
+      {walking && (
+        <p className="hint">
+          ドラッグで見回す ・ 床をタップで移動<span className="keys"> ・ WASD</span>
+        </p>
+      )}
       <div className="toggles">
         <Toggle
           label="時間帯"
@@ -66,12 +73,15 @@ export function Overlay({ view, onView, night, onNight, wallOpen, onWallOpen }: 
           <button
             key={option.id}
             type="button"
-            aria-pressed={option.id === view.id}
+            aria-pressed={!walking && option.id === view.id}
             onClick={() => onView(option)}
           >
             {option.label}
           </button>
         ))}
+        <button type="button" aria-pressed={walking} onClick={onWalk}>
+          歩く
+        </button>
       </nav>
     </div>
   )
