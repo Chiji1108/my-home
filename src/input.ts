@@ -9,7 +9,8 @@ const onLockChange = (listener: () => void) => {
   return () => document.removeEventListener('pointerlockchange', listener)
 }
 
-export const isLocked = () => document.pointerLockElement !== null
+// Where the browser has no pointer lock at all the element is undefined, not null.
+export const isLocked = () => Boolean(document.pointerLockElement)
 /** Whether the pointer is locked, which is what looking round with a mouse takes. */
 export const useLocked = () => useSyncExternalStore(onLockChange, isLocked)
 
