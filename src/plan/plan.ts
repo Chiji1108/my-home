@@ -71,6 +71,19 @@ export function spansBetween(gaps: readonly (readonly [number, number])[], start
   return spans.filter(([from, to]) => to - from > 1e-6)
 }
 
+/** The points just clear of either face of the wall, at the middle of an opening. */
+export function besideOpening(wall: Wall, opening: Opening): [Vec2, Vec2] {
+  const length = wallLength(wall)
+  const along: Vec2 = [(wall.to[0] - wall.from[0]) / length, (wall.to[1] - wall.from[1]) / length]
+  const middle = opening.offset + opening.width / 2
+  const reach = wall.thickness / 2 + 0.05
+  const beside = (side: -1 | 1): Vec2 => [
+    wall.from[0] + along[0] * middle - side * along[1] * reach,
+    wall.from[1] + along[1] * middle + side * along[0] * reach,
+  ]
+  return [beside(-1), beside(1)]
+}
+
 /** Opened, the panels of a sliding wall stack where the first one stands, at the `from` end. */
 export const panelWidth = (opening: Extract<Opening, { kind: 'slidingWall' }>) => opening.width / opening.panels
 
@@ -109,6 +122,10 @@ export const rooms: Room[] = [
   room('workroom', '洋室(2)', [rect(0, 7.3, 2.67, 10.95)]),
   room('balcony', 'バルコニー', [rect(0, 10.95, 6, 12.7)], 'balcony', -0.1, null),
 ]
+
+/** Level of the floor under a point, or undefined where there is none. */
+export const floorLevelAt = ([x, y]: Vec2) =>
+  rooms.find((room) => room.rects.some((r) => x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1))?.level
 
 const wall = (
   from: Vec2,

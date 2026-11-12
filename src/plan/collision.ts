@@ -3,7 +3,18 @@
 // walls, solids and furniture that are drawn.
 
 import { type Furniture, type FurnitureKind, furniture } from './furniture'
-import { type Opening, panelWidth, rooms, solids, spansBetween, type Vec2, type Wall, wallLength, walls } from './plan'
+import {
+  besideOpening,
+  floorLevelAt,
+  type Opening,
+  panelWidth,
+  solids,
+  spansBetween,
+  type Vec2,
+  type Wall,
+  wallLength,
+  walls,
+} from './plan'
 
 /** A rectangle lying along `axis`, a unit vector. */
 export type Box = {
@@ -15,13 +26,10 @@ export type Box = {
 // Pieces that lie flat on the floor or hang from the ceiling.
 const passable: ReadonlySet<FurnitureKind> = new Set(['rug', 'pendant', 'downlight'])
 
-const hasFloor = ([x, y]: Vec2) =>
-  rooms.some((room) => room.rects.some((r) => x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1))
-
 // The stretch of an opening that can be walked through, as offsets along
 // the wall. A door is a way through only where there is floor on both
 // sides. An open sliding wall is blocked only where its panels are stacked.
-function gap(opening: Opening, wall: Wall, axis: Vec2, wallOpen: boolean): [number, number] | null {
+function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] | null {
   const end = opening.offset + opening.width
   switch (opening.kind) {
     case 'window':
@@ -29,22 +37,17 @@ function gap(opening: Opening, wall: Wall, axis: Vec2, wallOpen: boolean): [numb
     case 'slidingWall':
       return wallOpen ? [opening.offset + panelWidth(opening), end] : null
     case 'door':
-    case 'slidingDoor': {
-      const middle = opening.offset + opening.width / 2
-      const reach = wall.thickness / 2 + 0.05
-      const beside = (side: -1 | 1): Vec2 => [
-        wall.from[0] + axis[0] * middle - side * axis[1] * reach,
-        wall.from[1] + axis[1] * middle + side * axis[0] * reach,
-      ]
-      return hasFloor(beside(-1)) && hasFloor(beside(1)) ? [opening.offset, end] : null
-    }
+    case 'slidingDoor':
+      return besideOpening(wall, opening).every((point) => floorLevelAt(point) !== undefined)
+        ? [opening.offset, end]
+        : null
   }
 }
 
 function wallBoxes(wall: Wall, wallOpen: boolean): Box[] {
   const length = wallLength(wall)
   const axis: Vec2 = [(wall.to[0] - wall.from[0]) / length, (wall.to[1] - wall.from[1]) / length]
-  const gaps = wall.openings.map((opening) => gap(opening, wall, axis, wallOpen)).filter((found) => found !== null)
+  const gaps = wall.openings.map((opening) => gap(opening, wall, wallOpen)).filter((found) => found !== null)
   return spansBetween(gaps, 0, length).map(([start, end]) => {
     const middle = (start + end) / 2
     return {

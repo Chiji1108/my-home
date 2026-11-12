@@ -2,7 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import { BoxGeometry, type Group, MathUtils, type Material } from 'three'
 import {
+  besideOpening,
   bounds,
+  floorLevelAt,
   type FloorFinish,
   type Opening,
   panelWidth,
@@ -25,6 +27,8 @@ import { PLANK_TILE } from './textures'
 const FLOOR_THICKNESS = 0.2
 const CEILING_THICKNESS = 0.1
 const FRAME = 0.04
+/** Width of the oak stile on the leading edge of a sliding wall panel. */
+const STILE = 0.02
 
 const floorMaterial: Record<FloorFinish, Material> = {
   oak: oakFloor,
@@ -123,7 +127,10 @@ function solidPieces(wall: Wall): Piece[] {
     const x0 = opening.offset
     const x1 = opening.offset + opening.width
     const sill = sillOf(opening)
-    pieces.push({ x0, x1, y0: WALL_BASE, y1: sill })
+    // The floor runs through an opening that reaches down to it. A piece of
+    // wall there would have its top in the plane of the floor.
+    const floor = Math.max(...besideOpening(wall, opening).map((point) => floorLevelAt(point) ?? -Infinity))
+    if (sill > floor) pieces.push({ x0, x1, y0: WALL_BASE, y1: sill })
     pieces.push({ x0, x1, y0: sill + opening.height, y1: wall.height })
   }
   return pieces.filter((piece) => piece.y1 - piece.y0 > 1e-6)
@@ -220,10 +227,15 @@ function SlidingWall({ opening }: { opening: Extract<Opening, { kind: 'slidingWa
     <group ref={group} position={[opening.offset + width / 2, opening.height / 2, 0]}>
       {Array.from({ length: opening.panels }, (_, index) => (
         <group key={index} position={[index * width, 0, (index - (opening.panels - 1) / 2) * trackGap]}>
-          <Block size={[width, opening.height, 0.028]} position={[0, 0, 0]} material={materials.panel} />
+          {/* The stile closes the panel's edge, so the two never share a face. */}
           <Block
-            size={[0.02, opening.height, 0.03]}
-            position={[width / 2 - 0.01, 0, 0]}
+            size={[width - STILE, opening.height, 0.028]}
+            position={[-STILE / 2, 0, 0]}
+            material={materials.panel}
+          />
+          <Block
+            size={[STILE, opening.height, 0.03]}
+            position={[(width - STILE) / 2, 0, 0]}
             material={materials.oak}
           />
         </group>
