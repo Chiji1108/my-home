@@ -3,10 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Euler, MathUtils, type PerspectiveCamera, Quaternion, Raycaster, Vector2, Vector3 } from 'three'
 import { move, obstacles } from '../plan/collision'
 import type { Vec2 } from '../plan/plan'
-import type { EyeViewpoint } from '../plan/viewpoints'
+import { EYE_HEIGHT, type EyeViewpoint } from '../plan/viewpoints'
 import { useSceneState } from './SceneState'
 
-const EYE_HEIGHT = 1.55
 const BODY_RADIUS = 0.2
 /** Metres per second. */
 const SPEED = 1.4
@@ -31,9 +30,14 @@ const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
   ArrowRight: [1, 0],
 }
 
+// Controls that put the arrow keys to their own use while focused.
+const usesArrows = (target: EventTarget | null) =>
+  target instanceof HTMLElement && target.matches('input, select, textarea, [contenteditable]')
+
 const raycaster = new Raycaster()
 const pointer = new Vector2()
 const eye = new Vector3()
+const normal = new Vector3()
 const gaze = new Quaternion()
 const angles = new Euler(0, 0, 0, 'YXZ')
 
@@ -78,7 +82,10 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
       )
       raycaster.setFromCamera(pointer, camera)
       const hit = raycaster.intersectObjects(scene.children)[0]
-      return hit && hit.point.y < FLOOR_TOP ? [hit.point.x, hit.point.z] : null
+      if (!hit?.face || hit.point.y > FLOOR_TOP) return null
+      // Facing up, so not the foot of a wall or of a piece of furniture.
+      const facesUp = normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y > 0.9
+      return facesUp ? [hit.point.x, hit.point.z] : null
     }
 
     const onDown = (event: PointerEvent) => {
@@ -97,17 +104,26 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     }
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== drag?.id) return
-      if (event.type === 'pointerup' && drag.travel < TAP_SLOP) body.goal = floorAt(event) ?? body.goal
+      const tapped = event.type === 'pointerup' && event.button === 0 && drag.travel < TAP_SLOP
+      if (tapped) body.goal = floorAt(event) ?? body.goal
       drag = null
     }
+    // While Meta is held the other keys never report being let go.
+    const release = () => body.keys.clear()
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Meta') return release()
       if (!(event.code in keyMoves) || event.metaKey || event.ctrlKey || event.altKey) return
-      // Keeps the arrow keys from also switching a focused toggle.
-      event.preventDefault()
+      if (event.code.startsWith('Arrow')) {
+        if (usesArrows(event.target)) return
+        // Keeps the arrow keys from scrolling the row of viewpoints.
+        event.preventDefault()
+      }
       body.keys.add(event.code)
     }
-    const onKeyUp = (event: KeyboardEvent) => body.keys.delete(event.code)
-    const onBlur = () => body.keys.clear()
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Meta') release()
+      else body.keys.delete(event.code)
+    }
 
     const listening = new AbortController()
     const { signal } = listening
@@ -117,7 +133,7 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     canvas.addEventListener('pointercancel', onUp, { signal })
     window.addEventListener('keydown', onKeyDown, { signal })
     window.addEventListener('keyup', onKeyUp, { signal })
-    window.addEventListener('blur', onBlur, { signal })
+    window.addEventListener('blur', release, { signal })
     return () => listening.abort()
   }, [body, camera, scene, canvas])
 
