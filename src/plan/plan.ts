@@ -69,7 +69,7 @@ export type Opening =
 
 export type Fitting = Extract<Opening, Movable>
 /** Which of the fittings stand open. */
-export type OpenState = Readonly<Record<FittingId, boolean>>
+export type FittingsOpen = Readonly<Record<FittingId, boolean>>
 
 export type Wall = {
   from: Vec2
@@ -304,10 +304,6 @@ export const fittings = walls.flatMap((wall) =>
   wall.openings.flatMap((opening) => ('id' in opening ? [{ wall, opening }] : [])),
 )
 export type PlacedFitting = (typeof fittings)[number]
-
-export const initiallyOpen = Object.fromEntries(
-  fittings.map(({ opening }) => [opening.id, opening.open]),
-) as OpenState
 
 // Rects stop at the inner wall faces so their tops never share a plane
 // with a wall of another finish.

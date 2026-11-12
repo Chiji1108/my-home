@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
-import type { Material } from 'three'
+import { type Group, type Material, MathUtils } from 'three'
 import { materials } from '../materials'
 import { Block, Cyl } from '../parts'
-import type { PieceProps } from './types'
+import { useTravel } from '../useTravel'
+import { ClothesRack } from './bedroom'
+import type { KnownPieceProps, PieceProps } from './types'
 
 const BOARD = 0.022
 
@@ -98,7 +100,52 @@ function Cabinet({ size: [w, d, h], doors }: PieceProps & { doors: Material }) {
   )
 }
 
-export const Closet = ({ size }: PieceProps) => <Cabinet size={size} doors={materials.panel} />
+/** Thickness of a cabinet door, and how far it stands open, in radians. */
+const DOOR = 0.02
+const DOOR_SWING = MathUtils.degToRad(80)
+
+// A wardrobe: a carcass of boards with a shelf and a rail of clothes in
+// it, behind a pair of doors that lie over its front (+z). Each door turns
+// about its outer front edge, so that neither the wall the wardrobe may
+// stand against nor the carcass is in the way of the open leaf.
+export function Closet({ id, size: [w, d, h] }: KnownPieceProps) {
+  const depth = d - DOOR
+  const inside = [w - BOARD * 2, depth - BOARD] as const
+  const middle = (BOARD - DOOR) / 2
+  const shelf = h - 0.4
+  const doors = useTravel<Group>(id, (doors, travel) => {
+    doors.children.forEach((door, index) => {
+      door.rotation.y = (index === 0 ? -1 : 1) * DOOR_SWING * travel
+    })
+  })
+  return (
+    <group>
+      {[-1, 1].map((side) => (
+        <Block
+          key={side}
+          size={[BOARD, h, depth]}
+          position={[side * (w / 2 - BOARD / 2), h / 2, -DOOR / 2]}
+          material={materials.panel}
+        />
+      ))}
+      <Block size={[inside[0], h, BOARD]} position={[0, h / 2, (BOARD - d) / 2]} material={materials.panel} />
+      {[BOARD / 2, h - BOARD / 2].map((y) => (
+        <Block key={y} size={[inside[0], BOARD, inside[1]]} position={[0, y, middle]} material={materials.panel} />
+      ))}
+      <group position={[0, 0, middle]}>
+        <ClothesRack size={[inside[0], inside[1], shelf]} />
+      </group>
+      <group ref={doors}>
+        {[-1, 1].map((side) => (
+          <group key={side} position={[(side * w) / 2, 0, d / 2]}>
+            <Block size={[w / 2, h - 0.012, DOOR]} position={[(-side * w) / 4, h / 2, -DOOR / 2]} material={materials.panel} />
+            <Block size={[0.012, 0.3, 0.012]} position={[-side * (w / 2 - 0.04), 1.0, 0.006]} material={materials.steel} />
+          </group>
+        ))}
+      </group>
+    </group>
+  )
+}
 export const ShoeCabinet = ({ size }: PieceProps) => <Cabinet size={size} doors={materials.oak} />
 
 export function Sideboard({ size }: PieceProps) {

@@ -13,8 +13,8 @@ import {
   Vector3,
 } from 'three'
 import { move, obstacles } from '../plan/collision'
-import { operable } from '../plan/interact'
-import type { FittingId, Vec2 } from '../plan/plan'
+import { type OperableId, operable } from '../plan/interact'
+import type { Vec2 } from '../plan/plan'
 import { type EyeViewpoint, eyeHeightAt, eyeHeightOf } from '../plan/viewpoints'
 import { useSceneState } from './SceneState'
 
@@ -60,8 +60,8 @@ const angles = new Euler(0, 0, 0, 'YXZ')
  * First-person walking. The body is a point on the plan with a heading; the
  * camera follows it, which also carries it in from wherever it was when the
  * walk began. Yaw 0 looks north and grows turning left. `onTarget` hears of
- * the fitting within reach each time it changes, and `onToggle` is asked to
- * open or shut it.
+ * what is within reach to open or shut each time that changes, and
+ * `onToggle` is asked to do it.
  */
 export function WalkControls({
   start,
@@ -69,15 +69,15 @@ export function WalkControls({
   onToggle,
 }: {
   start: EyeViewpoint
-  onTarget: (id: FittingId | null) => void
-  onToggle: (id: FittingId) => void
+  onTarget: (id: OperableId | null) => void
+  onToggle: (id: OperableId) => void
 }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera
   const scene = useThree((state) => state.scene)
   const canvas = useThree((state) => state.gl.domElement)
   const { open } = useSceneState()
   const boxes = useMemo(() => obstacles(open), [open])
-  const target = useRef<FittingId | null>(null)
+  const target = useRef<OperableId | null>(null)
 
   const [body] = useState(() => {
     const dx = start.lookAt[0] - start.position[0]
@@ -215,7 +215,7 @@ export function WalkControls({
     body.position = next
 
     const heading: Vec2 = [-Math.sin(body.yaw), -Math.cos(body.yaw)]
-    const reached = operable(next, heading, BODY_RADIUS, open)?.opening.id ?? null
+    const reached = operable(next, heading, BODY_RADIUS, open)?.id ?? null
     if (reached !== target.current) {
       target.current = reached
       onTarget(reached)

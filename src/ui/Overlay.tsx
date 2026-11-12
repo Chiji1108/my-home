@@ -1,4 +1,4 @@
-import type { FittingId, OpenState } from '../plan/plan'
+import type { OpenState, OperableId } from '../plan/interact'
 import { type Viewpoint, viewpoints } from '../plan/viewpoints'
 
 type Props = {
@@ -9,10 +9,10 @@ type Props = {
   night: boolean
   onNight: (night: boolean) => void
   open: OpenState
-  onOpen: (id: FittingId, open: boolean) => void
-  /** The fitting within reach of the walk. */
-  target: FittingId | null
-  onToggle: (id: FittingId) => void
+  onOpen: (id: OperableId, open: boolean) => void
+  /** What the walk has within reach to open or shut. */
+  target: OperableId | null
+  onToggle: (id: OperableId) => void
 }
 
 function Toggle<T extends string>({

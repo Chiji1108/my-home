@@ -2,13 +2,13 @@
 // a circle, and everything it can bump into is a box derived from the same
 // walls, solids and furniture that are drawn.
 
-import { type Furniture, type FurnitureKind, furniture } from './furniture'
+import { type Furniture, type FurnitureKind, furniture, widthAxis } from './furniture'
 import {
   besideWall,
   clearWay,
   floorLevelAt,
+  type FittingsOpen,
   type Opening,
-  type OpenState,
   panelWidth,
   solids,
   spansBetween,
@@ -35,7 +35,7 @@ const passable: ReadonlySet<FurnitureKind> = new Set(['rug', 'pendant', 'downlig
 // both sides of it, and a window only where that floor comes up to its
 // sill. An open sliding wall is blocked only where its panels are stacked.
 // The leaf of a door swung open is not in the way.
-function gap(opening: Opening, wall: Wall, open: OpenState): [number, number] | null {
+function gap(opening: Opening, wall: Wall, open: FittingsOpen): [number, number] | null {
   if (opening.kind === 'window' || !open[opening.id]) return null
   const whole: [number, number] = [opening.offset, opening.offset + opening.width]
   // The floor levels either side of the middle of a stretch, if there is floor on both.
@@ -57,7 +57,7 @@ function gap(opening: Opening, wall: Wall, open: OpenState): [number, number] | 
   }
 }
 
-function wallBoxes(wall: Wall, open: OpenState): Box[] {
+function wallBoxes(wall: Wall, open: FittingsOpen): Box[] {
   const axis = wallAxis(wall)
   const gaps = wall.openings.map((opening) => gap(opening, wall, open)).filter((found) => found !== null)
   return spansBetween(gaps, 0, wallLength(wall)).map(([start, end]) => {
@@ -70,14 +70,11 @@ function wallBoxes(wall: Wall, open: OpenState): Box[] {
   })
 }
 
-// A piece's width runs along its local x, which the scene turns about the
-// vertical by `rotation`.
-function footprint({ position, rotation, size }: Furniture): Box {
-  const angle = (rotation * Math.PI) / 180
-  return { centre: position, axis: [Math.cos(angle), -Math.sin(angle)], half: [size[0] / 2, size[1] / 2] }
+function footprint(item: Furniture): Box {
+  return { centre: item.position, axis: widthAxis(item), half: [item.size[0] / 2, item.size[1] / 2] }
 }
 
-export function obstacles(open: OpenState): Box[] {
+export function obstacles(open: FittingsOpen): Box[] {
   return [
     ...walls.flatMap((wall) => wallBoxes(wall, open)),
     ...solids.map(

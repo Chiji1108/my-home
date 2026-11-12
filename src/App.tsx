@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { useCallback, useState } from 'react'
-import { type FittingId, initiallyOpen } from './plan/plan'
+import { initiallyOpen, type OpenState, type OperableId } from './plan/interact'
 import { type Viewpoint, viewpoints, walkStart } from './plan/viewpoints'
 import { CameraRig } from './scene/CameraRig'
 import { FurnitureLayer } from './scene/furniture'
@@ -16,10 +16,10 @@ export function App() {
   const [shot, setShot] = useState<{ view: Viewpoint; walking: boolean }>({ view: viewpoints[0], walking: false })
   const [night, setNight] = useState(false)
   const [open, setOpen] = useState(initiallyOpen)
-  /** The fitting within reach of the walk. */
-  const [target, setTarget] = useState<FittingId | null>(null)
+  /** What the walk has within reach to open or shut. */
+  const [target, setTarget] = useState<OperableId | null>(null)
   const { view, walking } = shot
-  const toggle = useCallback((id: FittingId) => setOpen((open) => ({ ...open, [id]: !open[id] })), [])
+  const toggle = useCallback((id: OperableId) => setOpen((open): OpenState => ({ ...open, [id]: !open[id] })), [])
 
   return (
     <>

@@ -1,9 +1,8 @@
 import { createContext, useContext } from 'react'
-import { initiallyOpen, type OpenState } from '../plan/plan'
+import { initiallyOpen, type OpenState } from '../plan/interact'
 
 export type SceneState = {
   night: boolean
-  /** Which of the fittings stand open. */
   open: OpenState
 }
 
