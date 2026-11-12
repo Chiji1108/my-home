@@ -82,6 +82,12 @@ function Sky({ night }: { night: boolean }) {
   )
 }
 
+// The pane of a window has what is behind it shaded like everything else,
+// which spares drawing the glass twice more each frame to shade it apart.
+const shadeThroughGlass = (pass: { configuration: { transparencyAware: boolean } } | null) => {
+  if (pass) pass.configuration.transparencyAware = false
+}
+
 export function Lighting() {
   const { night } = useSceneState()
   const shadowsDirty = useShadowsDirty()
@@ -95,8 +101,18 @@ export function Lighting() {
       <Sky night={night} />
       {!night && <Sun />}
       <EffectComposer multisampling={4}>
-        <N8AO aoRadius={1} distanceFalloff={1} intensity={3} quality="medium" />
-        <Bloom mipmapBlur luminanceThreshold={3} intensity={0.5} />
+        {/* Half the samples the pass takes by default; the denoising, which costs next to nothing, hides the difference. */}
+        <N8AO
+          ref={shadeThroughGlass}
+          aoRadius={1}
+          distanceFalloff={1}
+          intensity={3}
+          aoSamples={8}
+          denoiseSamples={8}
+          denoiseRadius={12}
+        />
+        {/* Only the lamps are bright enough to glow, and they are lit only in the evening. */}
+        {night && <Bloom mipmapBlur luminanceThreshold={3} intensity={0.5} />}
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       </EffectComposer>
     </>
