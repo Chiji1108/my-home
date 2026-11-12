@@ -4,13 +4,12 @@ import { Euler, MathUtils, type PerspectiveCamera, Quaternion, Vector3 } from 't
 import { move, obstacles } from '../plan/collision'
 import { type OperableId, operable } from '../plan/interact'
 import type { Vec2 } from '../plan/plan'
-import { eyeHeightAt, eyeHeightOf, type Place } from '../plan/places'
+import { BODY_RADIUS, eyeHeightAt, type Standing } from '../plan/places'
 import { isLocked, lockPointer } from '../input'
-import { isSeeThrough, TAP_SLOP, under } from './pointing'
+import { floorPoint, isSeeThrough, TAP_SLOP, under } from './pointing'
 import { inReach } from './reach'
 import { useSceneState } from './SceneState'
 
-const BODY_RADIUS = 0.2
 /** Metres per second. */
 const SPEED = 1.4
 /** Radians turned by a drag as long as the viewport is tall. */
@@ -18,8 +17,6 @@ const TURN = 0.4 * Math.PI * 2
 /** Radians turned by a locked mouse for each pixel it moves. */
 const MOUSE_TURN = 0.002
 const MAX_PITCH = MathUtils.degToRad(70)
-/** A tap counts as on the floor up to this height, which takes in the rug. */
-const FLOOR_TOP = 0.05
 /** How quickly the camera makes up a jump of the body's, per second. */
 const EASE = 12
 /** What is left of a jump is dropped once it is this small, in metres and in radians. */
@@ -37,34 +34,17 @@ const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
 }
 
 const eye = new Vector3()
-const normal = new Vector3()
 const gaze = new Quaternion()
 const level = new Quaternion()
 const angles = new Euler(0, 0, 0, 'YXZ')
 
-// Where the body is and which way it looks on taking up the walk at a place.
-function standingAt(place: Place) {
-  const dx = place.lookAt[0] - place.position[0]
-  const dy = place.lookAt[1] - place.position[1]
-  const eye = eyeHeightOf(place)
-  return {
-    position: place.position as Vec2,
-    yaw: Math.atan2(-dx, -dy),
-    /** Height of the eye above the main floor, which follows the floor the body is on. */
-    eye,
-    pitch: Math.atan2(place.lookAtHeight - eye, Math.hypot(dx, dy)),
-    /** Where a tap on the floor is leading. */
-    goal: null as Vec2 | null,
-  }
-}
-
 /**
  * First-person walking. The body is a point on the plan with a heading,
- * and the camera is where its eye is: it turns and moves with the body in
- * the same frame, with nothing to catch up. Only a jump is eased, and
- * apart from that: being sent to a place, which carries the camera in from
- * wherever it was, and a step up or down between floors. Yaw 0 looks north
- * and grows turning left.
+ * `standing`, which is moved as it walks, and the camera is where its eye
+ * is: it turns and moves with the body in the same frame, with nothing to
+ * catch up. Only a jump is eased, and apart from that: taking up the walk,
+ * which carries the camera in from wherever it was, and a step up or down
+ * between floors.
  *
  * Any pointer looks round by dragging. Let go without having moved, a
  * finger walks to the spot of floor it tapped, and a mouse asks for the
@@ -72,19 +52,18 @@ function standingAt(place: Place) {
  * within reach to open or shut is kept up to date, and `onToggle` is asked
  * to do it.
  */
-export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onToggle: (id: OperableId) => void }) {
+export function WalkControls({ standing, onToggle }: { standing: Standing; onToggle: (id: OperableId) => void }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera
   const scene = useThree((state) => state.scene)
   const canvas = useThree((state) => state.gl.domElement)
   const { open } = useSceneState()
   const boxes = useMemo(() => obstacles(open), [open])
 
-  // `shot` is a new value each time a place is asked for, the same one
-  // included; `sent` is the one the body was last stood at.
   const [body] = useState(() => ({
-    ...standingAt(shot.place),
-    /** The shot the body was last stood at; none until the first frame, which stands it at this one. */
-    sent: null as object | null,
+    /** Height of the eye above the main floor, which follows the floor the body is on. None until the first frame. */
+    eye: null as number | null,
+    /** Where a tap on the floor is leading. */
+    goal: null as Vec2 | null,
     keys: new Set<string>(),
     /** What is left of a jump: how far the camera still is from the eye, and how far turned from its gaze. */
     lag: new Vector3(),
@@ -97,15 +76,12 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     const floorAt = (event: PointerEvent): Vec2 | null => {
       // Glass is looked through, so the floor beyond a pane can be tapped.
       const hit = under(event, canvas, camera, scene).find(({ object }) => !isSeeThrough(object))
-      if (!hit?.face || hit.point.y > FLOOR_TOP) return null
-      // Facing up, so not the foot of a wall or of a piece of furniture.
-      const facesUp = normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y > 0.9
-      return facesUp ? [hit.point.x, hit.point.z] : null
+      return hit ? floorPoint(hit) : null
     }
 
     const turn = (dx: number, dy: number, perPixel: number) => {
-      body.yaw -= dx * perPixel
-      body.pitch = MathUtils.clamp(body.pitch - dy * perPixel, -MAX_PITCH, MAX_PITCH)
+      standing.yaw -= dx * perPixel
+      standing.pitch = MathUtils.clamp(standing.pitch - dy * perPixel, -MAX_PITCH, MAX_PITCH)
     }
 
     const onDown = (event: PointerEvent) => {
@@ -143,8 +119,6 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
         return
       }
       if (!(event.code in keyMoves)) return
-      // Keeps the arrow keys from scrolling the row of places.
-      if (event.code.startsWith('Arrow')) event.preventDefault()
       body.keys.add(event.code)
     }
     const onKeyUp = (event: KeyboardEvent) => {
@@ -164,14 +138,12 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     document.addEventListener('mousemove', onMouseMove, { signal })
     document.addEventListener('pointerlockchange', release, { signal })
     return () => listening.abort()
-  }, [body, camera, scene, canvas, onToggle])
+  }, [body, standing, camera, scene, canvas, onToggle])
 
   // The walk ends with nothing within reach.
   useEffect(() => () => inReach.set(null), [])
 
   useFrame((_, delta) => {
-    const arriving = body.sent !== shot
-    if (arriving) Object.assign(body, standingAt(shot.place), { sent: shot })
     const dt = Math.min(delta, 0.1)
     let strafe = 0
     let forward = 0
@@ -183,11 +155,11 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     // The step to take this frame: keys win over a tapped goal.
     let step: Vec2 = [0, 0]
     let reach = SPEED * dt
-    const [x, y] = body.position
+    const [x, y] = standing.position
     if (strafe || forward) {
       body.goal = null
-      const sin = Math.sin(body.yaw)
-      const cos = Math.cos(body.yaw)
+      const sin = Math.sin(standing.yaw)
+      const cos = Math.cos(standing.yaw)
       const scale = reach / Math.hypot(strafe, forward)
       step = [(cos * strafe - sin * forward) * scale, (-sin * strafe - cos * forward) * scale]
     } else if (body.goal) {
@@ -200,21 +172,21 @@ export function WalkControls({ shot, onToggle }: { shot: { place: Place }; onTog
     }
 
     // Run even when standing still, so that a closing sliding wall moves the body aside.
-    const next = move(body.position, step, BODY_RADIUS, boxes)
+    const next = move(standing.position, step, BODY_RADIUS, boxes)
     // There is no route finding: a goal that the body can no longer close in on is dropped.
     if (body.goal && Math.hypot(next[0] - x, next[1] - y) < reach * 0.2) body.goal = null
-    body.position = next
+    standing.position = next
 
-    const heading: Vec2 = [-Math.sin(body.yaw), -Math.cos(body.yaw)]
+    const heading: Vec2 = [-Math.sin(standing.yaw), -Math.cos(standing.yaw)]
     inReach.set(operable(next, heading, BODY_RADIUS, open, boxes))
 
-    const height = eyeHeightAt(next) ?? body.eye
+    const height = eyeHeightAt(next) ?? body.eye ?? 0
     eye.set(next[0], height, next[1])
-    gaze.setFromEuler(angles.set(body.pitch, body.yaw, 0))
+    gaze.setFromEuler(angles.set(standing.pitch, standing.yaw, 0))
 
     const { lag, skew } = body
-    if (arriving) {
-      // Sent somewhere: the whole of the way from where the camera is.
+    if (body.eye === null) {
+      // Taking up the walk: the whole of the way from where the camera is.
       lag.copy(camera.position).sub(eye)
       skew.copy(gaze).invert().premultiply(camera.quaternion)
     } else {

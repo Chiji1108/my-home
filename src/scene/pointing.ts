@@ -1,8 +1,10 @@
 import type { OperableId } from '../plan/interact'
-import { type Camera, type Intersection, type Material, Mesh, type Object3D, Raycaster, Vector2 } from 'three'
+import type { Vec2 } from '../plan/plan'
+import { type Camera, type Intersection, type Material, Mesh, type Object3D, Raycaster, Vector2, Vector3 } from 'three'
 
 const raycaster = new Raycaster()
 const pointer = new Vector2()
+const normal = new Vector3()
 
 export const isSeeThrough = (object: Object3D) =>
   object instanceof Mesh && [object.material].flat().every((material: Material) => material.transparent)
@@ -15,6 +17,17 @@ export function under(event: { clientX: number; clientY: number }, canvas: HTMLC
   pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, 1 - ((event.clientY - rect.top) / rect.height) * 2)
   raycaster.setFromCamera(pointer, camera)
   return raycaster.intersectObjects(scene.children).filter(({ object }) => isShown(object))
+}
+
+/** A floor is no higher than this, which takes in the rug. */
+const FLOOR_TOP = 0.05
+
+/** The point of the plan that was hit, if what was hit there is floor. */
+export function floorPoint({ face, point, object }: Intersection): Vec2 | null {
+  if (!face || point.y > FLOOR_TOP) return null
+  // Facing up, so not the foot of a wall or of a piece of furniture.
+  const facesUp = normal.copy(face.normal).transformDirection(object.matrixWorld).y > 0.9
+  return facesUp ? [point.x, point.z] : null
 }
 
 /**

@@ -1,30 +1,46 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Euler } from 'three'
+import { type Box, obstacles } from '../plan/collision'
 import { type OperableId, works } from '../plan/interact'
-import { isSeeThrough, operableOf, TAP_SLOP, under } from './pointing'
+import { type Standing, standingNear } from '../plan/places'
+import type { Vec2 } from '../plan/plan'
+import { lockPointer } from '../input'
+import { floorPoint, isSeeThrough, operableOf, TAP_SLOP, under } from './pointing'
+import { useSceneState } from './SceneState'
 
 type Point = { clientX: number; clientY: number }
+type Picked = { work: OperableId } | { stand: Vec2 } | null
 
-// What a press at the point would work: the first thing under it, looking
-// through glass that is not itself part of a fitting.
-function pick(...[point, ...view]: Parameters<typeof under>) {
-  for (const { object } of under(point, ...view)) {
-    const id = operableOf(object)
-    if (id) return works(id) ? id : null
-    if (!isSeeThrough(object)) return null
+const angles = new Euler()
+
+// What a press at the point would do: work the first thing under it, or
+// stand on it if it is floor, looking through glass that is not itself
+// part of a fitting.
+function pick(boxes: readonly Box[], ...[point, ...view]: Parameters<typeof under>): Picked {
+  for (const hit of under(point, ...view)) {
+    const id = operableOf(hit.object)
+    if (id) return works(id) ? { work: id } : null
+    if (isSeeThrough(hit.object)) continue
+    const floor = floorPoint(hit)
+    const stand = floor && standingNear(floor, boxes)
+    return stand ? { stand } : null
   }
   return null
 }
 
 /**
- * Seen from above, a fitting is opened or shut by clicking or tapping it,
- * anywhere on it. A press that travels is a drag, which turns the view
- * instead.
+ * Seen from above, a click or a tap works what it lands on: a fitting,
+ * anywhere on it, is opened or shut, and the floor is stood on, looking
+ * the way the view from above was. A press that travels is a drag, which
+ * turns the view instead.
  */
-export function Picker({ onToggle }: { onToggle: (id: OperableId) => void }) {
+export function Picker({ onToggle, onStand }: { onToggle: (id: OperableId) => void; onStand: (at: Standing) => void }) {
   const camera = useThree((state) => state.camera)
   const scene = useThree((state) => state.scene)
   const canvas = useThree((state) => state.gl.domElement)
+  const { open } = useSceneState()
+  const boxes = useMemo(() => obstacles(open), [open])
   /** Where a mouse that is not pressed has moved to since the cursor was last set. */
   const [hover] = useState<{ moved: Point | null }>({ moved: null })
 
@@ -47,9 +63,14 @@ export function Picker({ onToggle }: { onToggle: (id: OperableId) => void }) {
     }
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== press?.id) return
-      const picked = event.button === 0 && press.travel < TAP_SLOP ? pick(event, canvas, camera, scene) : null
+      const picked = event.button === 0 && press.travel < TAP_SLOP ? pick(boxes, event, canvas, camera, scene) : null
       press = null
-      if (picked) onToggle(picked)
+      if (!picked) return
+      if ('work' in picked) return onToggle(picked.work)
+      // The way the camera is turned, which holds even looking straight down.
+      onStand({ position: picked.stand, yaw: angles.setFromQuaternion(camera.quaternion, 'YXZ').y, pitch: 0 })
+      // A click of the mouse on the way into the walk is the moment to lock the pointer.
+      lockPointer(event)
     }
     const onCancel = () => {
       press = null
@@ -65,12 +86,12 @@ export function Picker({ onToggle }: { onToggle: (id: OperableId) => void }) {
       listening.abort()
       canvas.style.cursor = ''
     }
-  }, [camera, scene, canvas, onToggle, hover])
+  }, [camera, scene, canvas, boxes, onToggle, onStand, hover])
 
   // The cursor shows what a click would do. Looked up once a frame at most.
   useFrame(() => {
     if (!hover.moved) return
-    canvas.style.cursor = pick(hover.moved, canvas, camera, scene) ? 'pointer' : ''
+    canvas.style.cursor = pick(boxes, hover.moved, canvas, camera, scene) ? 'pointer' : ''
     hover.moved = null
   })
 
