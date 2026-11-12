@@ -1,7 +1,8 @@
 import { Canvas } from '@react-three/fiber'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { obstacles } from './plan/collision'
 import { initiallyOpen, type OpenState, type OperableId } from './plan/interact'
-import { type Place, places } from './plan/places'
+import { type Standing, start } from './plan/places'
 import { CameraRig } from './scene/CameraRig'
 import { FurnitureLayer } from './scene/furniture'
 import { Lighting } from './scene/Lighting'
@@ -12,13 +13,20 @@ import { WalkControls } from './scene/WalkControls'
 import { Overlay } from './ui/Overlay'
 
 export function App() {
-  // How the unit is seen, and the place a walk was last sent to. A new
-  // value each time one is asked for, so that asking again for the view
-  // from above, or for the same place, goes back to it.
-  const [shot, setShot] = useState<{ walking: boolean; place: Place }>({ walking: false, place: places[0] })
+  // How the unit is seen. A new value each time a view is asked for, so
+  // that asking again for the view from above goes back to it.
+  const [shot, setShot] = useState({ walking: false })
+  // Where the walk stands and looks. It is the walk's to move, and kept
+  // here so that a walk is taken up again where the last one was left.
+  const standing = useRef<Standing>({ ...start })
   const [night, setNight] = useState(false)
   const [open, setOpen] = useState(initiallyOpen)
   const toggle = useCallback((id: OperableId) => setOpen((open): OpenState => ({ ...open, [id]: !open[id] })), [])
+  const scene = useMemo(() => ({ night, open, boxes: obstacles(open) }), [night, open])
+  const stand = useCallback((at: Standing) => {
+    standing.current = at
+    setShot({ walking: true })
+  }, [])
 
   return (
     <>
@@ -28,26 +36,25 @@ export function App() {
         gl={{ antialias: false }}
         camera={{ fov: 60, near: 0.05, far: 120 }}
       >
-        <SceneStateProvider value={{ night, open }}>
+        <SceneStateProvider value={scene}>
           <Shell />
           <FurnitureLayer />
           <Lighting />
           {shot.walking ? (
-            <WalkControls shot={shot} onToggle={toggle} />
+            <WalkControls standing={standing} onToggle={toggle} />
           ) : (
             <>
               <CameraRig shot={shot} />
-              <Picker onToggle={toggle} />
+              <Picker standing={standing} onToggle={toggle} onStand={stand} />
             </>
           )}
         </SceneStateProvider>
       </Canvas>
       <Overlay
         walking={shot.walking}
-        onOverview={() => setShot({ walking: false, place: shot.place })}
+        onOverview={() => setShot({ walking: false })}
         // Asked for during a walk, the walk carries on from where it is.
-        onWalk={() => shot.walking || setShot({ walking: true, place: shot.place })}
-        onPlace={(place) => setShot({ walking: true, place })}
+        onWalk={() => shot.walking || setShot({ walking: true })}
         night={night}
         onNight={setNight}
         open={open}

@@ -78,31 +78,7 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-/* One bar: how the unit is seen, then where a walk can be taken up. Only the places scroll. */
-.modes,
-.places {
-  display: flex;
-  gap: 2px;
-}
-
-.modes {
-  flex: none;
-  padding-right: 6px;
-  border-right: 1px solid var(--hairline);
-}
-
-.places {
-  min-width: 0;
-  padding-left: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-radius: 0 999px 999px 0;
-  /* Labels scrolled up to either end fade out rather than being cut. */
-  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
-}
-
 .bar button {
-  flex: none;
   padding: 7px 13px;
   border: 0;
   border-radius: 999px;
@@ -116,10 +92,6 @@ button:focus-visible {
   transition:
     background-color 0.2s,
     color 0.2s;
-}
-
-.places button:hover {
-  color: var(--ink);
 }
 
 .bar button[aria-pressed='true'] {
@@ -142,12 +114,15 @@ button:focus-visible {
 .hint {
   margin: 0;
   padding: 4px 11px;
-  border-radius: 999px;
+  border-radius: 13px;
   background: var(--surface);
   color: var(--ink-soft);
   font-size: 11px;
   letter-spacing: 0.06em;
-  white-space: nowrap;
+  /* Too long for the screen, it is broken where its parts are divided and nowhere else. */
+  word-break: keep-all;
+  text-align: center;
+  text-wrap: balance;
 }
 
 /* What a click on the scene will do, said where the click will land. */

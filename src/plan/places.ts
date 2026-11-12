@@ -1,19 +1,21 @@
+import { type Box, meets, settle, within } from './collision'
 import { floorLevelAt, type Vec2 } from './plan'
 
 /** The angle the unit is first seen from. Radians: azimuth 0 looks north from the balcony side; polar 0 is straight down. */
 export const overview = { azimuth: 0.4, polar: 0.62 }
 
-/** Somewhere a walk can be taken up: where to stand, and what to look at. */
-export type Place = {
-  id: string
-  label: string
+/** Where a walk stands and which way it looks. Radians: yaw 0 looks north and grows turning left; pitch 0 is level. */
+export type Standing = {
   /** In plan coordinates. */
   position: Vec2
-  lookAt: Vec2
-  /** Height of the point being looked at. */
-  lookAtHeight: number
+  yaw: number
+  pitch: number
 }
 
+/** Where a walk begins that has not been anywhere yet: in the passage, looking south into the LD and on to the balcony. */
+export const start: Standing = { position: [3.2, 5.4], yaw: -2.81, pitch: -0.14 }
+
+export const BODY_RADIUS = 0.2
 const EYE_HEIGHT = 1.5
 
 /** Height of the eye of someone standing at the point, or undefined where there is no floor to stand on. */
@@ -22,18 +24,21 @@ export function eyeHeightAt(point: Vec2) {
   return level === undefined ? undefined : level + EYE_HEIGHT
 }
 
-/** Height of the eye at a place, which has to be somewhere one can stand. */
-export function eyeHeightOf(place: Place) {
-  const height = eyeHeightAt(place.position)
-  if (height === undefined) throw new Error(`Place ${place.id} stands on no floor`)
-  return height
+/**
+ * Where a body asked to stand at the point does: there, or as near as
+ * what is around it leaves room. Null where the point is inside something,
+ * where there is no room on its side of whatever is in the way, or no
+ * floor to stand on.
+ */
+export function standingNear(point: Vec2, boxes: readonly Box[]): Vec2 | null {
+  if (boxes.some((box) => within(point, box))) return null
+  const spot = settle(point, BODY_RADIUS, boxes)
+  if (!spot || floorLevelAt(spot) === undefined) return null
+  const aside: Vec2 = [spot[0] - point[0], spot[1] - point[1]]
+  const reach = Math.hypot(...aside)
+  if (reach === 0) return spot
+  const heading: Vec2 = [aside[0] / reach, aside[1] / reach]
+  // Moved aside past a wall or a piece of furniture, it would be standing beyond it.
+  const beyond = boxes.some((box) => (meets(point, heading, box)?.distance ?? Infinity) < reach)
+  return beyond ? null : spot
 }
-
-export const places = [
-  { id: 'ld', label: 'LD', position: [3.2, 5.4], lookAt: [4.6, 9.5], lookAtHeight: 0.9 },
-  { id: 'kitchen', label: 'キッチン', position: [2.95, 4.8], lookAt: [5.6, 4.9], lookAtHeight: 1.0 },
-  { id: 'workroom', label: '仕事部屋', position: [1.8, 7.7], lookAt: [0.7, 9.9], lookAtHeight: 0.9 },
-  { id: 'bedroom', label: '寝室', position: [2.45, 3.0], lookAt: [0.6, 1.4], lookAtHeight: 0.6 },
-  { id: 'hobby', label: '趣味部屋', position: [4.1, 2.4], lookAt: [5.5, 1.4], lookAtHeight: 0.8 },
-  { id: 'entrance', label: '玄関', position: [3.05, 0.35], lookAt: [3.45, 4.4], lookAtHeight: 1.1 },
-] as const satisfies readonly Place[]

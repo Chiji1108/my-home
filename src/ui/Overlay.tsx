@@ -1,6 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react'
 import type { OpenState, OperableId } from '../plan/interact'
-import { type Place, places } from '../plan/places'
 import { useInReach } from '../scene/reach'
 import { lockPointer, useLocked, useTouching } from '../input'
 
@@ -8,7 +7,6 @@ type Props = {
   walking: boolean
   onOverview: () => void
   onWalk: () => void
-  onPlace: (place: Place) => void
   night: boolean
   onNight: (night: boolean) => void
   open: OpenState
@@ -34,7 +32,7 @@ const moon = (
   </Icon>
 )
 
-export function Overlay({ walking, onOverview, onWalk, onPlace, night, onNight, open, onToggle }: Props) {
+export function Overlay({ walking, onOverview, onWalk, night, onNight, open, onToggle }: Props) {
   const target = useInReach()
   const locked = useLocked()
   const touching = useTouching()
@@ -42,8 +40,8 @@ export function Overlay({ walking, onOverview, onWalk, onPlace, night, onNight, 
   // A click of the mouse on the way into the walk is the moment to lock the
   // pointer. The button is let go of, so that the keys are the walk's: a
   // click made with a key keeps it.
-  const walk = (enter: () => void) => (event: MouseEvent<HTMLButtonElement>) => {
-    enter()
+  const walk = (event: MouseEvent<HTMLButtonElement>) => {
+    onWalk()
     lockPointer(event.nativeEvent)
     if (event.detail > 0) event.currentTarget.blur()
   }
@@ -90,23 +88,14 @@ export function Overlay({ walking, onOverview, onWalk, onPlace, night, onNight, 
           </button>
         )}
         {walking && touching && <p className="hint">ドラッグで見回す ・ 床をタップで移動</p>}
-        {!walking && <p className="hint">ドラッグで回す ・ ドアや窓を押して開閉</p>}
-        <nav className="pill bar" aria-label="見方と行き先">
-          <div className="modes">
-            <button type="button" aria-pressed={!walking} onClick={onOverview}>
-              俯瞰
-            </button>
-            <button type="button" aria-pressed={walking} onClick={walk(onWalk)}>
-              歩く
-            </button>
-          </div>
-          <div className="places">
-            {places.map((place) => (
-              <button key={place.id} type="button" onClick={walk(() => onPlace(place))}>
-                {place.label}
-              </button>
-            ))}
-          </div>
+        {!walking && <p className="hint">ドラッグで回す ・ 床を押して立つ ・ ドアや窓を押して開閉</p>}
+        <nav className="pill bar" aria-label="見方">
+          <button type="button" aria-pressed={!walking} onClick={onOverview}>
+            俯瞰
+          </button>
+          <button type="button" aria-pressed={walking} onClick={walk}>
+            歩く
+          </button>
         </nav>
       </div>
     </div>

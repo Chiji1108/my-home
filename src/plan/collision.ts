@@ -111,6 +111,9 @@ function offBox(point: Vec2, box: Box): Vec2 {
   return [along - clamp(along, box.half[0]), across - clamp(across, box.half[1])]
 }
 
+/** Whether the point is in the box. */
+export const within = (point: Vec2, box: Box) => Math.hypot(...offBox(point, box)) === 0
+
 /** Whether a circle overlaps the box. */
 export const touches = (point: Vec2, radius: number, box: Box) => Math.hypot(...offBox(point, box)) < radius - 1e-9
 
@@ -168,9 +171,11 @@ function pushOut(point: Vec2, radius: number, box: Box): Vec2 {
   ]
 }
 
-// A free position near `point` for a circle of the given radius, or null
-// where the boxes around it leave no room, as in a gap narrower than the body.
-function settle(point: Vec2, radius: number, boxes: readonly Box[]): Vec2 | null {
+/**
+ * A free position near `point` for a circle of the given radius, or null
+ * where the boxes around it leave no room, as in a gap narrower than the body.
+ */
+export function settle(point: Vec2, radius: number, boxes: readonly Box[]): Vec2 | null {
   // Pushing out of one box can push into its neighbour, so go round again
   // until a pass moves nothing.
   for (let pass = 0; pass < 5; pass++) {

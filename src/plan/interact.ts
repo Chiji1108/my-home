@@ -36,8 +36,19 @@ const operables: Operable[] = [
   ...cabinets.map((item) => ({ id: furnitureId(item), box: footprint(item), frontOnly: true, shuts: false })),
 ]
 
-/** Whether the thing is one that can be worked at all. */
-export const works = (id: OperableId) => operables.some((candidate) => candidate.id === id)
+// An open fitting is not shut on a body that stands in its way.
+const shutsOn = (found: Operable, position: Vec2, radius: number, open: OpenState) =>
+  found.shuts && open[found.id] && touches(position, radius, found.box)
+
+/**
+ * Whether the thing can be worked while a body of the given radius stands
+ * at the position: it is one that can be worked at all, and not an open
+ * fitting that would shut on the body.
+ */
+export function works(id: OperableId, position: Vec2, radius: number, open: OpenState) {
+  const found = operables.find((candidate) => candidate.id === id)
+  return found !== undefined && !shutsOn(found, position, radius, open)
+}
 
 /**
  * What is being looked at, within reach: the nearest of the things that
@@ -71,6 +82,5 @@ export function operable(
   boxes: readonly Box[],
 ): OperableId | null {
   const found = facing(position, heading, boxes)
-  if (!found) return null
-  return found.shuts && open[found.id] && touches(position, radius, found.box) ? null : found.id
+  return found && !shutsOn(found, position, radius, open) ? found.id : null
 }
