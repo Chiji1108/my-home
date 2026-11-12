@@ -3,7 +3,7 @@
 // walls, solids and furniture that are drawn.
 
 import { type Furniture, type FurnitureKind, furniture } from './furniture'
-import { type Opening, rooms, solids, type Vec2, type Wall, walls } from './plan'
+import { type Opening, panelWidth, rooms, solids, spansBetween, type Vec2, type Wall, wallLength, walls } from './plan'
 
 /** A rectangle lying along `axis`, a unit vector. */
 export type Box = {
@@ -20,14 +20,14 @@ const hasFloor = ([x, y]: Vec2) =>
 
 // The stretch of an opening that can be walked through, as offsets along
 // the wall. A door is a way through only where there is floor on both
-// sides. An open sliding wall leaves its panels stacked at its `from` end.
+// sides. An open sliding wall is blocked only where its panels are stacked.
 function gap(opening: Opening, wall: Wall, axis: Vec2, wallOpen: boolean): [number, number] | null {
   const end = opening.offset + opening.width
   switch (opening.kind) {
     case 'window':
       return null
     case 'slidingWall':
-      return wallOpen ? [opening.offset + opening.width / opening.panels, end] : null
+      return wallOpen ? [opening.offset + panelWidth(opening), end] : null
     case 'door':
     case 'slidingDoor': {
       const middle = opening.offset + opening.width / 2
@@ -42,33 +42,17 @@ function gap(opening: Opening, wall: Wall, axis: Vec2, wallOpen: boolean): [numb
 }
 
 function wallBoxes(wall: Wall, wallOpen: boolean): Box[] {
-  const dx = wall.to[0] - wall.from[0]
-  const dy = wall.to[1] - wall.from[1]
-  const length = Math.hypot(dx, dy)
-  const axis: Vec2 = [dx / length, dy / length]
-  const gaps = wall.openings
-    .map((opening) => gap(opening, wall, axis, wallOpen))
-    .filter((found) => found !== null)
-    .sort((a, b) => a[0] - b[0])
-
-  const spans: [number, number][] = []
-  let cursor = 0
-  for (const [start, end] of gaps) {
-    spans.push([cursor, start])
-    cursor = end
-  }
-  spans.push([cursor, length])
-
-  return spans
-    .filter(([start, end]) => end - start > 1e-6)
-    .map(([start, end]) => {
-      const middle = (start + end) / 2
-      return {
-        centre: [wall.from[0] + axis[0] * middle, wall.from[1] + axis[1] * middle],
-        axis,
-        half: [(end - start) / 2, wall.thickness / 2],
-      }
-    })
+  const length = wallLength(wall)
+  const axis: Vec2 = [(wall.to[0] - wall.from[0]) / length, (wall.to[1] - wall.from[1]) / length]
+  const gaps = wall.openings.map((opening) => gap(opening, wall, axis, wallOpen)).filter((found) => found !== null)
+  return spansBetween(gaps, 0, length).map(([start, end]) => {
+    const middle = (start + end) / 2
+    return {
+      centre: [wall.from[0] + axis[0] * middle, wall.from[1] + axis[1] * middle],
+      axis,
+      half: [(end - start) / 2, wall.thickness / 2],
+    }
+  })
 }
 
 // A piece's width runs along its local x, which the scene turns about the
@@ -104,7 +88,7 @@ function pushOut(point: Vec2, radius: number, { centre, axis, half }: Box): Vec2
   let offAlong = along - clamp(along, half[0])
   let offAcross = across - clamp(across, half[1])
   let distance = Math.hypot(offAlong, offAcross)
-  if (distance >= radius) return point
+  if (distance >= radius - 1e-9) return point
 
   if (distance < 1e-9) {
     // The centre is inside the box: leave through the nearest face.
@@ -124,15 +108,17 @@ function pushOut(point: Vec2, radius: number, { centre, axis, half }: Box): Vec2
   ]
 }
 
-// A free position near `point` for a circle of the given radius.
-function settle(point: Vec2, radius: number, boxes: readonly Box[]): Vec2 {
-  // Pushing out of one box can push into its neighbour, so go round again.
-  for (let pass = 0; pass < 4; pass++) {
+// A free position near `point` for a circle of the given radius, or null
+// where the boxes around it leave no room, as in a gap narrower than the body.
+function settle(point: Vec2, radius: number, boxes: readonly Box[]): Vec2 | null {
+  // Pushing out of one box can push into its neighbour, so go round again
+  // until a pass moves nothing.
+  for (let pass = 0; pass < 5; pass++) {
     const before = point
     for (const box of boxes) point = pushOut(point, radius, box)
-    if (point === before) break
+    if (point === before) return point
   }
-  return point
+  return null
 }
 
 /**
@@ -144,7 +130,9 @@ export function move(from: Vec2, step: Vec2, radius: number, boxes: readonly Box
   const strides = Math.max(1, Math.ceil(Math.hypot(step[0], step[1]) / (radius / 2)))
   let point = from
   for (let i = 0; i < strides; i++) {
-    point = settle([point[0] + step[0] / strides, point[1] + step[1] / strides], radius, boxes)
+    const next = settle([point[0] + step[0] / strides, point[1] + step[1] / strides], radius, boxes)
+    if (!next) break
+    point = next
   }
   return point
 }
