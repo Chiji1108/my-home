@@ -3,7 +3,7 @@ import { useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { MathUtils, type PerspectiveCamera, Vector3 } from 'three'
 import { bounds } from '../plan/plan'
-import { EYE_HEIGHT, type Viewpoint } from '../plan/viewpoints'
+import { eyeHeightOf, type Viewpoint } from '../plan/viewpoints'
 
 const { ACTION } = CameraControlsImpl
 
@@ -61,7 +61,7 @@ export function CameraRig({ shot }: { shot: { view: Viewpoint } }) {
       return
     }
 
-    const eye = new Vector3(view.position[0], EYE_HEIGHT, view.position[1])
+    const eye = new Vector3(view.position[0], eyeHeightOf(view), view.position[1])
     const gaze = new Vector3(view.lookAt[0], view.lookAtHeight, view.lookAt[1]).sub(eye).setLength(0.05)
     const target = eye.clone().add(gaze)
     rig.minDistance = 0.05

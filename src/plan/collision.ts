@@ -4,7 +4,7 @@
 
 import { type Furniture, type FurnitureKind, furniture } from './furniture'
 import {
-  besideOpening,
+  besideWall,
   clearWay,
   floorLevelAt,
   type Opening,
@@ -29,20 +29,28 @@ export type Box = {
 const passable: ReadonlySet<FurnitureKind> = new Set(['rug', 'pendant', 'downlight'])
 
 // The stretch of an opening that can be walked through, as offsets along
-// the wall. A door, or a window with a sash slid aside, is a way through
-// only where there is floor on both sides. An open sliding wall is blocked
-// only where its panels are stacked.
+// the wall. A door, or a window with a sash slid open, is a way through
+// only where there is floor on both sides of it, and a window only where
+// that floor comes up to its sill. An open sliding wall is blocked only
+// where its panels are stacked.
 function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] | null {
-  const end = opening.offset + opening.width
-  const leadsSomewhere = () => besideOpening(wall, opening).every((point) => floorLevelAt(point) !== undefined)
+  const whole: [number, number] = [opening.offset, opening.offset + opening.width]
+  // The floor levels either side of the middle of a stretch, if there is floor on both.
+  const floors = ([from, to]: [number, number]) => {
+    const [left, right] = besideWall(wall, (from + to) / 2).map(floorLevelAt)
+    return left === undefined || right === undefined ? null : [left, right]
+  }
   switch (opening.kind) {
-    case 'window':
-      return leadsSomewhere() ? clearWay(opening) : null
+    case 'window': {
+      const way = clearWay(opening)
+      const levels = way && floors(way)
+      return levels && Math.max(...levels) >= opening.sill ? way : null
+    }
     case 'slidingWall':
-      return wallOpen ? [opening.offset + panelWidth(opening), end] : null
+      return wallOpen ? [opening.offset + panelWidth(opening), whole[1]] : null
     case 'door':
     case 'slidingDoor':
-      return leadsSomewhere() ? [opening.offset, end] : null
+      return floors(whole) ? whole : null
   }
 }
 

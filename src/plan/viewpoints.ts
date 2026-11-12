@@ -1,4 +1,4 @@
-import type { Vec2 } from './plan'
+import { floorLevelAt, type Vec2 } from './plan'
 
 export type Viewpoint =
   | {
@@ -22,7 +22,20 @@ export type Viewpoint =
 
 export type EyeViewpoint = Extract<Viewpoint, { kind: 'eye' }>
 
-export const EYE_HEIGHT = 1.5
+const EYE_HEIGHT = 1.5
+
+/** Height of the eye of someone standing at the point, or undefined where there is no floor to stand on. */
+export function eyeHeightAt(point: Vec2) {
+  const level = floorLevelAt(point)
+  return level === undefined ? undefined : level + EYE_HEIGHT
+}
+
+/** Height of the eye at a viewpoint, which has to be somewhere one can stand. */
+export function eyeHeightOf(view: EyeViewpoint) {
+  const height = eyeHeightAt(view.position)
+  if (height === undefined) throw new Error(`Viewpoint ${view.id} stands on no floor`)
+  return height
+}
 
 const ld = { id: 'ld', label: 'LD', kind: 'eye', position: [3.2, 5.4], lookAt: [4.6, 9.5], lookAtHeight: 0.9 } as const
 

@@ -49,8 +49,8 @@ export type Opening =
       kind: 'window'
       sill: number
       glass: 'clear' | 'frosted'
-      /** A sash slid aside leaves this much of the opening clear, measured from that end. */
-      way?: { at: End; width: number }
+      /** Set on a pair of sliding sashes: both shut, or the sash at that end slid open behind the other. */
+      sash?: 'shut' | End
     })
   | (Span & { kind: 'slidingWall'; panels: number })
 
@@ -83,22 +83,42 @@ export function wallAxis(wall: Wall): Vec2 {
   return [(wall.to[0] - wall.from[0]) / length, (wall.to[1] - wall.from[1]) / length]
 }
 
-/** The points just clear of the wall's left and right faces, at the middle of an opening. */
-export function besideOpening(wall: Wall, opening: Opening): [left: Vec2, right: Vec2] {
+/** The points just clear of the wall's left and right faces, `along` it from its `from` end. */
+export function besideWall(wall: Wall, along: number): [left: Vec2, right: Vec2] {
   const axis = wallAxis(wall)
-  const middle = opening.offset + opening.width / 2
   const reach = wall.thickness / 2 + 0.05
   const beside = (side: -1 | 1): Vec2 => [
-    wall.from[0] + axis[0] * middle - side * axis[1] * reach,
-    wall.from[1] + axis[1] * middle + side * axis[0] * reach,
+    wall.from[0] + axis[0] * along - side * axis[1] * reach,
+    wall.from[1] + axis[1] * along + side * axis[0] * reach,
   ]
   return [beside(-1), beside(1)]
 }
 
-/** The stretch of a window that a sash slid aside leaves clear, as offsets along the wall. */
-export function clearWay({ offset, width, way }: Extract<Opening, { kind: 'window' }>): [number, number] | null {
-  if (!way) return null
-  return way.at === 'start' ? [offset, offset + way.width] : [offset + width - way.width, offset + width]
+/** Width of the members of a window's frame, and of the stiles of its sashes. */
+export const WINDOW_FRAME = 0.04
+
+type Window = Extract<Opening, { kind: 'window' }>
+
+/**
+ * A pair of sliding sashes inside the frame: how wide each is, and where
+ * each begins, measured from the start of the opening. Shut, they overlap
+ * by a stile where they meet.
+ */
+export function sashes({ width, sash }: Window) {
+  const each = (width - WINDOW_FRAME) / 2
+  const near = WINDOW_FRAME
+  const far = width - WINDOW_FRAME - each
+  return { width: each, starts: [sash === 'start' ? far : near, sash === 'end' ? near : far] as const }
+}
+
+/** The stretch of a window that a sash slid open leaves clear inside the frame, as offsets along the wall. */
+export function clearWay(window: Window): [number, number] | null {
+  const { offset, width, sash } = window
+  if (sash !== 'start' && sash !== 'end') return null
+  const taken = sashes(window).width
+  return sash === 'start'
+    ? [offset + WINDOW_FRAME, offset + width - WINDOW_FRAME - taken]
+    : [offset + WINDOW_FRAME + taken, offset + width - WINDOW_FRAME]
 }
 
 /** Opened, the panels of a sliding wall stack where the first one stands, at the `from` end. */
@@ -140,9 +160,13 @@ export const rooms: Room[] = [
   room('balcony', 'バルコニー', [rect(0, 10.95, 6, 12.7)], 'balcony', -0.1, null),
 ]
 
-/** Level of the floor under a point, or undefined where there is none. */
+/**
+ * Level of the floor under a point, or undefined where there is none. A
+ * rectangle owns its north and west edges, so a point on the seam between
+ * two rooms is on exactly one of them.
+ */
 export const floorLevelAt = ([x, y]: Vec2) =>
-  rooms.find((room) => room.rects.some((r) => x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1))?.level
+  rooms.find((room) => room.rects.some((r) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1))?.level
 
 const wall = (
   from: Vec2,
@@ -162,15 +186,14 @@ const northWindow = (offset: number): Opening => ({
   glass: 'frosted',
 })
 
-// A pair of sliding sashes. One of them may stand open, as the way out.
-const balconyWindow = (offset: number, width: number, open?: End): Opening => ({
+const balconyWindow = (offset: number, width: number, sash: 'shut' | End = 'shut'): Opening => ({
   kind: 'window',
   offset,
   width,
   height: DOOR,
   sill: 0,
   glass: 'clear',
-  ...(open && { way: { at: open, width: width / 2 } }),
+  sash,
 })
 
 export const walls: Wall[] = [

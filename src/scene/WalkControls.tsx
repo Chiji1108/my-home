@@ -1,9 +1,20 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useState } from 'react'
-import { Euler, MathUtils, type PerspectiveCamera, Quaternion, Raycaster, Vector2, Vector3 } from 'three'
+import {
+  Euler,
+  type Material,
+  MathUtils,
+  Mesh,
+  type Object3D,
+  type PerspectiveCamera,
+  Quaternion,
+  Raycaster,
+  Vector2,
+  Vector3,
+} from 'three'
 import { move, obstacles } from '../plan/collision'
-import { floorLevelAt, type Vec2 } from '../plan/plan'
-import { EYE_HEIGHT, type EyeViewpoint } from '../plan/viewpoints'
+import type { Vec2 } from '../plan/plan'
+import { type EyeViewpoint, eyeHeightAt, eyeHeightOf } from '../plan/viewpoints'
 import { useSceneState } from './SceneState'
 
 const BODY_RADIUS = 0.2
@@ -34,6 +45,9 @@ const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
 const usesArrows = (target: EventTarget | null) =>
   target instanceof HTMLElement && target.matches('input, select, textarea, [contenteditable]')
 
+const isSeeThrough = (object: Object3D) =>
+  object instanceof Mesh && [object.material].flat().every((material: Material) => material.transparent)
+
 const raycaster = new Raycaster()
 const pointer = new Vector2()
 const eye = new Vector3()
@@ -59,7 +73,9 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     return {
       position: start.position as Vec2,
       yaw: Math.atan2(-dx, -dy),
-      pitch: Math.atan2(start.lookAtHeight - EYE_HEIGHT, Math.hypot(dx, dy)),
+      /** Height of the eye above the main floor, which follows the floor the body is on. */
+      eye: eyeHeightOf(start),
+      pitch: Math.atan2(start.lookAtHeight - eyeHeightOf(start), Math.hypot(dx, dy)),
       /** Where a tap on the floor is leading. */
       goal: null as Vec2 | null,
       keys: new Set<string>(),
@@ -81,7 +97,8 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
         1 - ((event.clientY - rect.top) / rect.height) * 2,
       )
       raycaster.setFromCamera(pointer, camera)
-      const hit = raycaster.intersectObjects(scene.children)[0]
+      // Glass is looked through, so the floor beyond a pane can be tapped.
+      const hit = raycaster.intersectObjects(scene.children).find(({ object }) => !isSeeThrough(object))
       if (!hit?.face || hit.point.y > FLOOR_TOP) return null
       // Facing up, so not the foot of a wall or of a piece of furniture.
       const facesUp = normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y > 0.9
@@ -172,8 +189,8 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     body.position = next
 
     const ease = 1 - Math.exp(-EASE * dt)
-    // The eye rides at its height above whichever floor the body is on.
-    camera.position.lerp(eye.set(next[0], (floorLevelAt(next) ?? 0) + EYE_HEIGHT, next[1]), ease)
+    body.eye = eyeHeightAt(next) ?? body.eye
+    camera.position.lerp(eye.set(next[0], body.eye, next[1]), ease)
     camera.quaternion.slerp(gaze.setFromEuler(angles.set(body.pitch, body.yaw, 0)), ease)
   })
 
