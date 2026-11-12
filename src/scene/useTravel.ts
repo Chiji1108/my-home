@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { MathUtils, type Object3D } from 'three'
 import type { OperableId } from '../plan/interact'
 import { useSceneState } from './SceneState'
@@ -16,6 +16,9 @@ const AT_REST = 1e-4
  * state has it, and after that easing towards the state and stopping dead
  * on reaching it. The shadows are drawn again on the frames in which it
  * moves and on no others.
+ *
+ * What comes back is spread onto that object: the ref, and the id it is
+ * known by to whatever is pointed at it.
  */
 export function useTravel<T extends Object3D>(id: OperableId, place: (object: T, travel: number) => void) {
   const { open } = useSceneState()
@@ -33,5 +36,5 @@ export function useTravel<T extends Object3D>(id: OperableId, place: (object: T,
     shadowsDirty()
   })
 
-  return object
+  return useMemo(() => ({ ref: object, userData: { operable: id } }), [id])
 }

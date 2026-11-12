@@ -196,7 +196,7 @@ function Sashes({ opening }: { opening: Extract<Opening, { kind: 'slidingWindow'
     })
   })
   return (
-    <group ref={group} position={[0, opening.sill + opening.height / 2, 0]}>
+    <group {...group} position={[0, opening.sill + opening.height / 2, 0]}>
       {pair.shut.map((x, track) => (
         <Sash key={x} z={(track - 0.5) * SASH_TRACKS} width={pair.width} height={opening.height - FRAME * 2} />
       ))}
@@ -241,7 +241,7 @@ function Door({ opening }: { opening: Extract<Opening, { kind: 'door' }> }) {
     door.rotation.y = angle * travel
   })
   return (
-    <group ref={group} position={[hingeX, 0, 0]}>
+    <group {...group} position={[hingeX, 0, 0]}>
       <Block
         size={[width - 0.01, height - 0.01, 0.035]}
         position={[(reach * width) / 2, height / 2, 0]}
@@ -271,7 +271,7 @@ function SlidingDoor({
     leaf.position.x = offset + width / 2 + run * travel
   })
   return (
-    <group ref={leaf} position={[0, height / 2, z]}>
+    <group {...leaf} position={[0, height / 2, z]}>
       <Block size={[width + 0.04, height, 0.03]} position={[0, 0, 0]} material={materials.oak} />
     </group>
   )
@@ -296,7 +296,7 @@ function SlidingWall({
   })
 
   return (
-    <group ref={group} position={[opening.offset + width / 2, opening.height / 2, 0]}>
+    <group {...group} position={[opening.offset + width / 2, opening.height / 2, 0]}>
       {Array.from({ length: opening.panels }, (_, index) => (
         <group key={index} position={[0, 0, (index - (opening.panels - 1) / 2) * track]}>
           {/* The stile closes the panel's edge, so the two never share a face. */}

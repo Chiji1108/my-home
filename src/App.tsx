@@ -1,22 +1,23 @@
 import { Canvas } from '@react-three/fiber'
 import { useCallback, useState } from 'react'
 import { initiallyOpen, type OpenState, type OperableId } from './plan/interact'
-import { type Viewpoint, viewpoints, walkStart } from './plan/viewpoints'
+import { type Place, places } from './plan/places'
 import { CameraRig } from './scene/CameraRig'
 import { FurnitureLayer } from './scene/furniture'
 import { Lighting } from './scene/Lighting'
+import { Picker } from './scene/Picker'
 import { SceneStateProvider } from './scene/SceneState'
 import { Shell } from './scene/Shell'
 import { WalkControls } from './scene/WalkControls'
 import { Overlay } from './ui/Overlay'
 
 export function App() {
-  // Wrapped so that choosing the current viewpoint again is a new value,
-  // which sends a camera the user has moved back to it.
-  const [shot, setShot] = useState<{ view: Viewpoint; walking: boolean }>({ view: viewpoints[0], walking: false })
+  // How the unit is seen, and the place a walk was last sent to. A new
+  // value each time one is asked for, so that asking again for the view
+  // from above, or for the same place, goes back to it.
+  const [shot, setShot] = useState<{ walking: boolean; place: Place }>({ walking: false, place: places[0] })
   const [night, setNight] = useState(false)
   const [open, setOpen] = useState(initiallyOpen)
-  const { view, walking } = shot
   const toggle = useCallback((id: OperableId) => setOpen((open): OpenState => ({ ...open, [id]: !open[id] })), [])
 
   return (
@@ -31,19 +32,25 @@ export function App() {
           <Shell />
           <FurnitureLayer />
           <Lighting />
-          {walking && <WalkControls start={walkStart(view)} onToggle={toggle} />}
+          {shot.walking ? (
+            <WalkControls shot={shot} onToggle={toggle} />
+          ) : (
+            <>
+              <CameraRig shot={shot} />
+              <Picker onToggle={toggle} />
+            </>
+          )}
         </SceneStateProvider>
-        {!walking && <CameraRig shot={shot} />}
       </Canvas>
       <Overlay
-        view={view}
-        onView={(next) => setShot({ view: next, walking: false })}
-        walking={walking}
-        onWalk={() => setShot({ view, walking: true })}
+        walking={shot.walking}
+        onOverview={() => setShot({ walking: false, place: shot.place })}
+        // Asked for during a walk, the walk carries on from where it is.
+        onWalk={() => shot.walking || setShot({ walking: true, place: shot.place })}
+        onPlace={(place) => setShot({ walking: true, place })}
         night={night}
         onNight={setNight}
         open={open}
-        onOpen={(id, to) => setOpen((open): OpenState => ({ ...open, [id]: to }))}
         onToggle={toggle}
       />
     </>

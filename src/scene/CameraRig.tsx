@@ -1,11 +1,9 @@
-import { CameraControls, CameraControlsImpl } from '@react-three/drei'
+import { CameraControls, type CameraControlsImpl } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { MathUtils, type PerspectiveCamera, Vector3 } from 'three'
+import { overview } from '../plan/places'
 import { bounds } from '../plan/plan'
-import { eyeHeightOf, type Viewpoint } from '../plan/viewpoints'
-
-const { ACTION } = CameraControlsImpl
 
 // Aimed a little south of the unit's middle so the plan sits above the
 // controls at the bottom of the screen.
@@ -30,7 +28,12 @@ function fittingDistance(azimuth: number, polar: number, fov: number, aspect: nu
   )
 }
 
-export function CameraRig({ shot }: { shot: { view: Viewpoint } }) {
+/**
+ * The view from above, orbiting the unit. `shot` is a new value each time
+ * the view is asked for, which sends a camera the user has moved back to
+ * where it began.
+ */
+export function CameraRig({ shot }: { shot: object }) {
   const controls = useRef<CameraControlsImpl>(null)
   const camera = useThree((state) => state.camera) as PerspectiveCamera
   const aspect = useThree((state) => state.size.width / state.size.height)
@@ -40,43 +43,16 @@ export function CameraRig({ shot }: { shot: { view: Viewpoint } }) {
   useEffect(() => {
     const rig = controls.current
     if (!rig) return
-    const { view } = shot
-    const animate = settled.current
-    const inside = view.kind === 'eye'
-
-    // Inside a room the camera turns on the spot: zooming narrows the lens
-    // instead of walking through furniture, and panning is off.
-    rig.mouseButtons.wheel = inside ? ACTION.ZOOM : ACTION.DOLLY
-    rig.mouseButtons.right = inside ? ACTION.NONE : ACTION.TRUCK
-    rig.touches.two = inside ? ACTION.TOUCH_ZOOM : ACTION.TOUCH_DOLLY_TRUCK
-    rig.touches.three = inside ? ACTION.NONE : ACTION.TOUCH_TRUCK
-    rig.maxPolarAngle = inside ? Math.PI : 1.45
-    rig.azimuthRotateSpeed = inside ? 0.4 : 1
-    rig.polarRotateSpeed = inside ? 0.4 : 1
-    void rig.zoomTo(1, animate)
-
-    if (view.kind === 'dollhouse') {
-      void rig.normalizeRotations().rotateTo(view.azimuth, view.polar, animate)
-      void rig.moveTo(centre.x, centre.y, centre.z, animate)
-      return
-    }
-
-    const eye = new Vector3(view.position[0], eyeHeightOf(view), view.position[1])
-    const gaze = new Vector3(view.lookAt[0], view.lookAtHeight, view.lookAt[1]).sub(eye).setLength(0.05)
-    const target = eye.clone().add(gaze)
-    rig.minDistance = 0.05
-    rig.maxDistance = 0.05
-    void rig.setLookAt(eye.x, eye.y, eye.z, target.x, target.y, target.z, animate)
+    void rig.normalizeRotations().rotateTo(overview.azimuth, overview.polar, settled.current)
+    void rig.moveTo(centre.x, centre.y, centre.z, settled.current)
   }, [shot])
 
   // The distance that fits the unit depends on the viewport's shape, so it
   // is set again whenever that changes.
   useEffect(() => {
     const rig = controls.current
-    const { view } = shot
-    if (!rig || view.kind !== 'dollhouse') return
-    const distance = fittingDistance(view.azimuth, view.polar, camera.fov, aspect)
-    rig.minDistance = 3
+    if (!rig) return
+    const distance = fittingDistance(overview.azimuth, overview.polar, camera.fov, aspect)
     rig.maxDistance = distance * 1.5
     void rig.dollyTo(distance, settled.current)
   }, [shot, camera, aspect])
@@ -85,5 +61,5 @@ export function CameraRig({ shot }: { shot: { view: Viewpoint } }) {
     settled.current = true
   }, [])
 
-  return <CameraControls ref={controls} makeDefault minZoom={1} maxZoom={3} smoothTime={0.6} />
+  return <CameraControls ref={controls} makeDefault minDistance={3} maxPolarAngle={1.45} smoothTime={0.6} />
 }
