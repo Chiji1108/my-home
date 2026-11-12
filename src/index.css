@@ -131,8 +131,35 @@ canvas {
   white-space: nowrap;
 }
 
+.interact {
+  gap: 8px;
+  padding: 9px 18px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.interact:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.interact kbd {
+  min-width: 1.5em;
+  padding: 2px 0;
+  border: 1px solid var(--ink-soft);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
 @media (pointer: coarse) {
-  .hint .keys {
+  .keys {
     display: none;
   }
 }

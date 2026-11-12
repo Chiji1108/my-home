@@ -8,6 +8,7 @@ import {
   clearWay,
   floorLevelAt,
   type Opening,
+  type OpenState,
   panelWidth,
   solids,
   spansBetween,
@@ -29,11 +30,13 @@ export type Box = {
 const passable: ReadonlySet<FurnitureKind> = new Set(['rug', 'pendant', 'downlight'])
 
 // The stretch of an opening that can be walked through, as offsets along
-// the wall. A door, or a window with a sash slid open, is a way through
-// only where there is floor on both sides of it, and a window only where
-// that floor comes up to its sill. An open sliding wall is blocked only
-// where its panels are stacked.
-function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] | null {
+// the wall. Only a fitting that stands open has one. A door, or a window
+// with its sash slid open, is a way through only where there is floor on
+// both sides of it, and a window only where that floor comes up to its
+// sill. An open sliding wall is blocked only where its panels are stacked.
+// The leaf of a door swung open is not in the way.
+function gap(opening: Opening, wall: Wall, open: OpenState): [number, number] | null {
+  if (opening.kind === 'window' || !open[opening.id]) return null
   const whole: [number, number] = [opening.offset, opening.offset + opening.width]
   // The floor levels either side of the middle of a stretch, if there is floor on both.
   const floors = ([from, to]: [number, number]) => {
@@ -41,22 +44,22 @@ function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] 
     return left === undefined || right === undefined ? null : [left, right]
   }
   switch (opening.kind) {
-    case 'window': {
+    case 'slidingWindow': {
       const way = clearWay(opening)
-      const levels = way && floors(way)
+      const levels = floors(way)
       return levels && Math.max(...levels) >= opening.sill ? way : null
     }
     case 'slidingWall':
-      return wallOpen ? [opening.offset + panelWidth(opening), whole[1]] : null
+      return [opening.offset + panelWidth(opening), whole[1]]
     case 'door':
     case 'slidingDoor':
       return floors(whole) ? whole : null
   }
 }
 
-function wallBoxes(wall: Wall, wallOpen: boolean): Box[] {
+function wallBoxes(wall: Wall, open: OpenState): Box[] {
   const axis = wallAxis(wall)
-  const gaps = wall.openings.map((opening) => gap(opening, wall, wallOpen)).filter((found) => found !== null)
+  const gaps = wall.openings.map((opening) => gap(opening, wall, open)).filter((found) => found !== null)
   return spansBetween(gaps, 0, wallLength(wall)).map(([start, end]) => {
     const middle = (start + end) / 2
     return {
@@ -74,9 +77,9 @@ function footprint({ position, rotation, size }: Furniture): Box {
   return { centre: position, axis: [Math.cos(angle), -Math.sin(angle)], half: [size[0] / 2, size[1] / 2] }
 }
 
-export function obstacles({ wallOpen }: { wallOpen: boolean }): Box[] {
+export function obstacles(open: OpenState): Box[] {
   return [
-    ...walls.flatMap((wall) => wallBoxes(wall, wallOpen)),
+    ...walls.flatMap((wall) => wallBoxes(wall, open)),
     ...solids.map(
       ({ rect }): Box => ({
         centre: [(rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2],

@@ -1,3 +1,4 @@
+import type { FittingId, OpenState } from '../plan/plan'
 import { type Viewpoint, viewpoints } from '../plan/viewpoints'
 
 type Props = {
@@ -7,8 +8,11 @@ type Props = {
   onWalk: () => void
   night: boolean
   onNight: (night: boolean) => void
-  wallOpen: boolean
-  onWallOpen: (open: boolean) => void
+  open: OpenState
+  onOpen: (id: FittingId, open: boolean) => void
+  /** The fitting within reach of the walk. */
+  target: FittingId | null
+  onToggle: (id: FittingId) => void
 }
 
 function Toggle<T extends string>({
@@ -40,9 +44,15 @@ function Toggle<T extends string>({
   )
 }
 
-export function Overlay({ view, onView, walking, onWalk, night, onNight, wallOpen, onWallOpen }: Props) {
+export function Overlay({ view, onView, walking, onWalk, night, onNight, open, onOpen, target, onToggle }: Props) {
   return (
     <div className="overlay" data-night={night}>
+      {target && (
+        <button type="button" className="pill interact" onClick={() => onToggle(target)}>
+          <kbd className="keys">E</kbd>
+          {open[target] ? '閉める' : '開ける'}
+        </button>
+      )}
       {walking && (
         <p className="hint">
           ドラッグで見回す ・ 床をタップで移動<span className="keys"> ・ WASD</span>
@@ -64,8 +74,8 @@ export function Overlay({ view, onView, walking, onWalk, night, onNight, wallOpe
             { value: 'open', label: '開' },
             { value: 'closed', label: '閉' },
           ]}
-          value={wallOpen ? 'open' : 'closed'}
-          onChange={(value) => onWallOpen(value === 'open')}
+          value={open.slidingWall ? 'open' : 'closed'}
+          onChange={(value) => onOpen('slidingWall', value === 'open')}
         />
       </div>
       <nav className="pill views" aria-label="視点">

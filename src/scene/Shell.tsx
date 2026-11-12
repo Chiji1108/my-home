@@ -23,9 +23,9 @@ import {
 } from '../plan/plan'
 import { materials, oakFloor } from './materials'
 import { Block } from './parts'
-import { useSceneState } from './SceneState'
 import { useShadowsDirty } from './shadows'
 import { PLANK_TILE } from './textures'
+import { useTravel } from './useTravel'
 
 const FLOOR_THICKNESS = 0.2
 const CEILING_THICKNESS = 0.1
@@ -35,8 +35,6 @@ const SASH_DEPTH = 0.02
 const SASH_TRACKS = 0.026
 /** Width of the oak stile on the leading edge of a sliding wall panel. */
 const STILE = 0.02
-/** A sliding panel this close to where it is going is put there. */
-const AT_REST = 1e-4
 
 const floorMaterial: Record<FloorFinish, Material> = {
   oak: oakFloor,
@@ -92,7 +90,7 @@ function Ceiling({ rect, height }: { rect: Rect; height: number }) {
   )
 }
 
-const sillOf = (opening: Opening) => (opening.kind === 'window' ? opening.sill : 0)
+const sillOf = (opening: Opening) => ('sill' in opening ? opening.sill : 0)
 
 function isOn(point: Vec2, wall: Wall) {
   const [ax, ay] = wall.from
@@ -161,11 +159,11 @@ function solidPieces(wall: Wall): Piece[] {
 // from `from`, y is up, and +z is the wall's right-hand side.
 const sideSign = (side: 'left' | 'right') => (side === 'right' ? 1 : -1)
 
-// A sash: two stiles, two rails and the pane they hold, from `x` to `x + width`.
-function Sash({ x, y, z, width, height }: { x: number; y: number; z: number; width: number; height: number }) {
+// A sash: two stiles, two rails and the pane they hold, about the middle of its track.
+function Sash({ z, width, height }: { z: number; width: number; height: number }) {
   const pane = [width - FRAME * 2, height - FRAME * 2] as const
   return (
-    <group position={[x + width / 2, y, z]}>
+    <group position={[0, 0, z]}>
       {[-1, 1].map((side) => (
         <group key={side}>
           <Block
@@ -187,12 +185,30 @@ function Sash({ x, y, z, width, height }: { x: number; y: number; z: number; wid
   )
 }
 
-function Window({ opening, thickness }: { opening: Extract<Opening, { kind: 'window' }>; thickness: number }) {
-  const { width, height, sill, glass, sash } = opening
+type WindowOpening = Extract<Opening, { kind: 'window' | 'slidingWindow' }>
+
+// Each sash runs on its own track, so the one that opens can stand behind the other.
+function Sashes({ opening }: { opening: Extract<Opening, { kind: 'slidingWindow' }> }) {
+  const pair = sashes(opening)
+  const group = useTravel<Group>(opening.id, (sashes, travel) => {
+    sashes.children.forEach((sash, track) => {
+      sash.position.x = (pair.shut[track] ?? 0) + (pair.travel[track] ?? 0) * travel + pair.width / 2
+    })
+  })
+  return (
+    <group ref={group} position={[0, opening.sill + opening.height / 2, 0]}>
+      {pair.shut.map((x, track) => (
+        <Sash key={x} z={(track - 0.5) * SASH_TRACKS} width={pair.width} height={opening.height - FRAME * 2} />
+      ))}
+    </group>
+  )
+}
+
+function Window({ opening, thickness }: { opening: WindowOpening; thickness: number }) {
+  const { width, height, sill } = opening
   const depth = Math.min(0.07, thickness)
   const midY = sill + height / 2
   const inside = [width - FRAME * 2, height - FRAME * 2] as const
-  const pair = sashes(opening)
   return (
     <group position={[opening.offset, 0, 0]}>
       {[sill + FRAME / 2, sill + height - FRAME / 2].map((y) => (
@@ -201,13 +217,13 @@ function Window({ opening, thickness }: { opening: Extract<Opening, { kind: 'win
       {[FRAME / 2, width - FRAME / 2].map((x) => (
         <Block key={x} size={[FRAME, inside[1], depth]} position={[x, midY, 0]} material={materials.steel} />
       ))}
-      {sash ? (
-        // Each sash runs on its own track, so one can stand behind the other.
-        pair.starts.map((x, track) => (
-          <Sash key={track} x={x} y={midY} z={(track - 0.5) * SASH_TRACKS} width={pair.width} height={inside[1]} />
-        ))
+      {opening.kind === 'slidingWindow' ? (
+        <Sashes opening={opening} />
       ) : (
-        <mesh position={[width / 2, midY, 0]} material={glass === 'frosted' ? materials.frostedGlass : materials.glass}>
+        <mesh
+          position={[width / 2, midY, 0]}
+          material={opening.glass === 'frosted' ? materials.frostedGlass : materials.glass}
+        >
           <boxGeometry args={[inside[0], inside[1], 0.01]} />
         </mesh>
       )}
@@ -215,13 +231,17 @@ function Window({ opening, thickness }: { opening: Extract<Opening, { kind: 'win
   )
 }
 
+// The leaf turns about its hinge, on the wall's centreline at the jamb.
 function Door({ opening }: { opening: Extract<Opening, { kind: 'door' }> }) {
   const { width, height, hinge, swingsTo, ajar, leaf } = opening
   const reach = hinge === 'start' ? 1 : -1
   const angle = MathUtils.degToRad(ajar) * -reach * sideSign(swingsTo)
   const hingeX = opening.offset + (hinge === 'start' ? 0 : width)
+  const group = useTravel<Group>(opening.id, (door, travel) => {
+    door.rotation.y = angle * travel
+  })
   return (
-    <group position={[hingeX, 0, 0]} rotation-y={angle}>
+    <group ref={group} position={[hingeX, 0, 0]}>
       <Block
         size={[width - 0.01, height - 0.01, 0.035]}
         position={[(reach * width) / 2, height / 2, 0]}
@@ -236,7 +256,7 @@ function Door({ opening }: { opening: Extract<Opening, { kind: 'door' }> }) {
   )
 }
 
-// Drawn slid open, resting against the wall face.
+// The leaf hangs clear of the wall face and slides along it.
 function SlidingDoor({
   opening,
   thickness,
@@ -245,14 +265,15 @@ function SlidingDoor({
   thickness: number
 }) {
   const { offset, width, height, leafSide, slidesTo } = opening
-  const travel = width * 0.9 * (slidesTo === 'end' ? 1 : -1)
+  const run = width * 0.9 * (slidesTo === 'end' ? 1 : -1)
   const z = sideSign(leafSide) * (thickness / 2 + 0.02)
+  const leaf = useTravel<Group>(opening.id, (leaf, travel) => {
+    leaf.position.x = offset + width / 2 + run * travel
+  })
   return (
-    <Block
-      size={[width + 0.04, height, 0.03]}
-      position={[offset + width / 2 + travel, height / 2, z]}
-      material={materials.oak}
-    />
+    <group ref={leaf} position={[0, height / 2, z]}>
+      <Block size={[width + 0.04, height, 0.03]} position={[0, 0, 0]} material={materials.oak} />
+    </group>
   )
 }
 
@@ -266,26 +287,18 @@ function SlidingWall({
   opening: Extract<Opening, { kind: 'slidingWall' }>
   thickness: number
 }) {
-  const { wallOpen } = useSceneState()
-  const group = useRef<Group>(null)
-  const shadowsDirty = useShadowsDirty()
   const width = panelWidth(opening)
   const track = thickness / opening.panels
-
-  useFrame((_, delta) => {
-    group.current?.children.forEach((panel, index) => {
-      const rest = wallOpen ? 0 : index * width
-      if (panel.position.x === rest) return
-      const next = MathUtils.damp(panel.position.x, rest, 5, delta)
-      panel.position.x = Math.abs(next - rest) < AT_REST ? rest : next
-      shadowsDirty()
+  const group = useTravel<Group>(opening.id, (panels, travel) => {
+    panels.children.forEach((panel, index) => {
+      panel.position.x = index * width * (1 - travel)
     })
   })
 
   return (
     <group ref={group} position={[opening.offset + width / 2, opening.height / 2, 0]}>
       {Array.from({ length: opening.panels }, (_, index) => (
-        <group key={index} position={[index * width, 0, (index - (opening.panels - 1) / 2) * track]}>
+        <group key={index} position={[0, 0, (index - (opening.panels - 1) / 2) * track]}>
           {/* The stile closes the panel's edge, so the two never share a face. */}
           <Block
             size={[width - STILE, opening.height, track * 0.8]}
@@ -306,6 +319,7 @@ function SlidingWall({
 function OpeningView({ opening, thickness }: { opening: Opening; thickness: number }) {
   switch (opening.kind) {
     case 'window':
+    case 'slidingWindow':
       return <Window opening={opening} thickness={thickness} />
     case 'door':
       return <Door opening={opening} />
