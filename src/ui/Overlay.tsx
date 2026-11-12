@@ -88,7 +88,7 @@ export function Overlay({ walking, onOverview, onWalk, night, onNight, open, onT
           </button>
         )}
         {walking && touching && <p className="hint">ドラッグで見回す ・ 床をタップで移動</p>}
-        {!walking && <p className="hint">床を押してそこに立つ ・ ドアや窓を押して開閉</p>}
+        {!walking && <p className="hint">ドラッグで回す ・ 床を押して立つ ・ ドアや窓を押して開閉</p>}
         <nav className="pill bar" aria-label="見方">
           <button type="button" aria-pressed={!walking} onClick={onOverview}>
             俯瞰

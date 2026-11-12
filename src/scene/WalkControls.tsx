@@ -1,12 +1,12 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useState } from 'react'
+import { type RefObject, useEffect, useState } from 'react'
 import { Euler, MathUtils, type PerspectiveCamera, Quaternion, Vector3 } from 'three'
-import { move, obstacles } from '../plan/collision'
+import { move } from '../plan/collision'
 import { type OperableId, operable } from '../plan/interact'
 import type { Vec2 } from '../plan/plan'
 import { BODY_RADIUS, eyeHeightAt, type Standing } from '../plan/places'
 import { isLocked, lockPointer } from '../input'
-import { floorPoint, isSeeThrough, TAP_SLOP, under } from './pointing'
+import { floorAmong, TAP_SLOP, under } from './pointing'
 import { inReach } from './reach'
 import { useSceneState } from './SceneState'
 
@@ -40,7 +40,7 @@ const angles = new Euler(0, 0, 0, 'YXZ')
 
 /**
  * First-person walking. The body is a point on the plan with a heading,
- * `standing`, which is moved as it walks, and the camera is where its eye
+ * what `standing` holds, which is moved as it walks, and the camera is where its eye
  * is: it turns and moves with the body in the same frame, with nothing to
  * catch up. Only a jump is eased, and apart from that: taking up the walk,
  * which carries the camera in from wherever it was, and a step up or down
@@ -52,12 +52,11 @@ const angles = new Euler(0, 0, 0, 'YXZ')
  * within reach to open or shut is kept up to date, and `onToggle` is asked
  * to do it.
  */
-export function WalkControls({ standing, onToggle }: { standing: Standing; onToggle: (id: OperableId) => void }) {
+export function WalkControls({ standing, onToggle }: { standing: RefObject<Standing>; onToggle: (id: OperableId) => void }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera
   const scene = useThree((state) => state.scene)
   const canvas = useThree((state) => state.gl.domElement)
-  const { open } = useSceneState()
-  const boxes = useMemo(() => obstacles(open), [open])
+  const { open, boxes } = useSceneState()
 
   const [body] = useState(() => ({
     /** Height of the eye above the main floor, which follows the floor the body is on. None until the first frame. */
@@ -73,15 +72,10 @@ export function WalkControls({ standing, onToggle }: { standing: Standing; onTog
   useEffect(() => {
     let drag: { id: number; x: number; y: number; travel: number } | null = null
 
-    const floorAt = (event: PointerEvent): Vec2 | null => {
-      // Glass is looked through, so the floor beyond a pane can be tapped.
-      const hit = under(event, canvas, camera, scene).find(({ object }) => !isSeeThrough(object))
-      return hit ? floorPoint(hit) : null
-    }
-
     const turn = (dx: number, dy: number, perPixel: number) => {
-      standing.yaw -= dx * perPixel
-      standing.pitch = MathUtils.clamp(standing.pitch - dy * perPixel, -MAX_PITCH, MAX_PITCH)
+      const stance = standing.current
+      stance.yaw -= dx * perPixel
+      stance.pitch = MathUtils.clamp(stance.pitch - dy * perPixel, -MAX_PITCH, MAX_PITCH)
     }
 
     const onDown = (event: PointerEvent) => {
@@ -102,7 +96,8 @@ export function WalkControls({ standing, onToggle }: { standing: Standing; onTog
       drag = null
       if (!tapped) return
       if (event.pointerType === 'mouse') lockPointer(event)
-      else body.goal = floorAt(event) ?? body.goal
+      // Glass is looked through, so the floor beyond a pane can be tapped.
+      else body.goal = floorAmong(under(event, canvas, camera, scene)) ?? body.goal
     }
     const onMouseMove = (event: MouseEvent) => {
       if (isLocked()) turn(event.movementX, event.movementY, MOUSE_TURN)
@@ -155,11 +150,12 @@ export function WalkControls({ standing, onToggle }: { standing: Standing; onTog
     // The step to take this frame: keys win over a tapped goal.
     let step: Vec2 = [0, 0]
     let reach = SPEED * dt
-    const [x, y] = standing.position
+    const stance = standing.current
+    const [x, y] = stance.position
     if (strafe || forward) {
       body.goal = null
-      const sin = Math.sin(standing.yaw)
-      const cos = Math.cos(standing.yaw)
+      const sin = Math.sin(stance.yaw)
+      const cos = Math.cos(stance.yaw)
       const scale = reach / Math.hypot(strafe, forward)
       step = [(cos * strafe - sin * forward) * scale, (-sin * strafe - cos * forward) * scale]
     } else if (body.goal) {
@@ -172,17 +168,17 @@ export function WalkControls({ standing, onToggle }: { standing: Standing; onTog
     }
 
     // Run even when standing still, so that a closing sliding wall moves the body aside.
-    const next = move(standing.position, step, BODY_RADIUS, boxes)
+    const next = move(stance.position, step, BODY_RADIUS, boxes)
     // There is no route finding: a goal that the body can no longer close in on is dropped.
     if (body.goal && Math.hypot(next[0] - x, next[1] - y) < reach * 0.2) body.goal = null
-    standing.position = next
+    stance.position = next
 
-    const heading: Vec2 = [-Math.sin(standing.yaw), -Math.cos(standing.yaw)]
+    const heading: Vec2 = [-Math.sin(stance.yaw), -Math.cos(stance.yaw)]
     inReach.set(operable(next, heading, BODY_RADIUS, open, boxes))
 
     const height = eyeHeightAt(next) ?? body.eye ?? 0
     eye.set(next[0], height, next[1])
-    gaze.setFromEuler(angles.set(standing.pitch, standing.yaw, 0))
+    gaze.setFromEuler(angles.set(stance.pitch, stance.yaw, 0))
 
     const { lag, skew } = body
     if (body.eye === null) {

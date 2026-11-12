@@ -1,4 +1,4 @@
-import { type Box, meets, settle } from './collision'
+import { type Box, meets, settle, within } from './collision'
 import { floorLevelAt, type Vec2 } from './plan'
 
 /** The angle the unit is first seen from. Radians: azimuth 0 looks north from the balcony side; polar 0 is straight down. */
@@ -12,7 +12,7 @@ export type Standing = {
   pitch: number
 }
 
-/** Where a walk begins that has not been anywhere yet: in the LD, looking down its length at the balcony. */
+/** Where a walk begins that has not been anywhere yet: in the passage, looking south into the LD and on to the balcony. */
 export const start: Standing = { position: [3.2, 5.4], yaw: -2.81, pitch: -0.14 }
 
 export const BODY_RADIUS = 0.2
@@ -26,16 +26,19 @@ export function eyeHeightAt(point: Vec2) {
 
 /**
  * Where a body asked to stand at the point does: there, or as near as
- * what is around it leaves room. Null where there is no room on its side
- * of whatever is in the way, or no floor to stand on.
+ * what is around it leaves room. Null where the point is inside something,
+ * where there is no room on its side of whatever is in the way, or no
+ * floor to stand on.
  */
 export function standingNear(point: Vec2, boxes: readonly Box[]): Vec2 | null {
+  if (boxes.some((box) => within(point, box))) return null
   const spot = settle(point, BODY_RADIUS, boxes)
   if (!spot || floorLevelAt(spot) === undefined) return null
   const aside: Vec2 = [spot[0] - point[0], spot[1] - point[1]]
   const reach = Math.hypot(...aside)
+  if (reach === 0) return spot
   const heading: Vec2 = [aside[0] / reach, aside[1] / reach]
   // Moved aside past a wall or a piece of furniture, it would be standing beyond it.
-  const beyond = reach > 0 && boxes.some((box) => (meets(point, heading, box)?.distance ?? Infinity) < reach)
+  const beyond = boxes.some((box) => (meets(point, heading, box)?.distance ?? Infinity) < reach)
   return beyond ? null : spot
 }

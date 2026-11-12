@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { obstacles } from './plan/collision'
 import { initiallyOpen, type OpenState, type OperableId } from './plan/interact'
 import { type Standing, start } from './plan/places'
 import { CameraRig } from './scene/CameraRig'
@@ -17,17 +18,15 @@ export function App() {
   const [shot, setShot] = useState({ walking: false })
   // Where the walk stands and looks. It is the walk's to move, and kept
   // here so that a walk is taken up again where the last one was left.
-  const [standing] = useState<Standing>(() => ({ ...start }))
+  const standing = useRef<Standing>({ ...start })
   const [night, setNight] = useState(false)
   const [open, setOpen] = useState(initiallyOpen)
   const toggle = useCallback((id: OperableId) => setOpen((open): OpenState => ({ ...open, [id]: !open[id] })), [])
-  const stand = useCallback(
-    (at: Standing) => {
-      Object.assign(standing, at)
-      setShot({ walking: true })
-    },
-    [standing],
-  )
+  const scene = useMemo(() => ({ night, open, boxes: obstacles(open) }), [night, open])
+  const stand = useCallback((at: Standing) => {
+    standing.current = at
+    setShot({ walking: true })
+  }, [])
 
   return (
     <>
@@ -37,7 +36,7 @@ export function App() {
         gl={{ antialias: false }}
         camera={{ fov: 60, near: 0.05, far: 120 }}
       >
-        <SceneStateProvider value={{ night, open }}>
+        <SceneStateProvider value={scene}>
           <Shell />
           <FurnitureLayer />
           <Lighting />
@@ -46,7 +45,7 @@ export function App() {
           ) : (
             <>
               <CameraRig shot={shot} />
-              <Picker onToggle={toggle} onStand={stand} />
+              <Picker standing={standing} onToggle={toggle} onStand={stand} />
             </>
           )}
         </SceneStateProvider>

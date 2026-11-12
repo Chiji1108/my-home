@@ -114,12 +114,15 @@ button:focus-visible {
 .hint {
   margin: 0;
   padding: 4px 11px;
-  border-radius: 999px;
+  border-radius: 13px;
   background: var(--surface);
   color: var(--ink-soft);
   font-size: 11px;
   letter-spacing: 0.06em;
-  white-space: nowrap;
+  /* Too long for the screen, it is broken where its parts are divided and nowhere else. */
+  word-break: keep-all;
+  text-align: center;
+  text-wrap: balance;
 }
 
 /* What a click on the scene will do, said where the click will land. */

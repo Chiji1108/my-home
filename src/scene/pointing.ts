@@ -1,5 +1,5 @@
 import type { OperableId } from '../plan/interact'
-import type { Vec2 } from '../plan/plan'
+import { floorLevelAt, type Vec2 } from '../plan/plan'
 import { type Camera, type Intersection, type Material, Mesh, type Object3D, Raycaster, Vector2, Vector3 } from 'three'
 
 const raycaster = new Raycaster()
@@ -19,15 +19,23 @@ export function under(event: { clientX: number; clientY: number }, canvas: HTMLC
   return raycaster.intersectObjects(scene.children).filter(({ object }) => isShown(object))
 }
 
-/** A floor is no higher than this, which takes in the rug. */
+/** A floor comes no higher than this above its room's level, which takes in the rug. */
 const FLOOR_TOP = 0.05
 
-/** The point of the plan that was hit, if what was hit there is floor. */
-export function floorPoint({ face, point, object }: Intersection): Vec2 | null {
-  if (!face || point.y > FLOOR_TOP) return null
+/**
+ * The point of floor among what lies under a pointer: where the first
+ * thing that is not looked through, as glass is, is floor. Null if it is
+ * anything else.
+ */
+export function floorAmong(hits: Intersection[]): Vec2 | null {
+  const hit = hits.find(({ object }) => !isSeeThrough(object))
+  if (!hit?.face) return null
+  const at: Vec2 = [hit.point.x, hit.point.z]
+  const level = floorLevelAt(at)
+  if (level === undefined || hit.point.y > level + FLOOR_TOP) return null
   // Facing up, so not the foot of a wall or of a piece of furniture.
-  const facesUp = normal.copy(face.normal).transformDirection(object.matrixWorld).y > 0.9
-  return facesUp ? [point.x, point.z] : null
+  const facesUp = normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y > 0.9
+  return facesUp ? at : null
 }
 
 /**

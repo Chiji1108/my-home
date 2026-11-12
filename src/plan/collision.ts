@@ -111,6 +111,9 @@ function offBox(point: Vec2, box: Box): Vec2 {
   return [along - clamp(along, box.half[0]), across - clamp(across, box.half[1])]
 }
 
+/** Whether the point is in the box. */
+export const within = (point: Vec2, box: Box) => Math.hypot(...offBox(point, box)) === 0
+
 /** Whether a circle overlaps the box. */
 export const touches = (point: Vec2, radius: number, box: Box) => Math.hypot(...offBox(point, box)) < radius - 1e-9
 
