@@ -47,6 +47,7 @@ export function Rug({ size: [w, d, h] }: PieceProps) {
   return <Soft size={[w, h, d]} position={[0, h / 2 + 0.001, 0]} material={materials.wool} radius={h * 0.45} />
 }
 
+// A shelf with a rail of clothes under it. The wardrobe has one inside.
 export function ClothesRack({ size: [w, d, h] }: PieceProps) {
   const garments = [materials.linen, materials.charcoal, materials.olive, materials.cotton, materials.terracotta]
   const count = Math.floor((w - 0.2) / 0.11)

@@ -50,6 +50,20 @@ const item = (
   size: Furniture['size'],
 ): Furniture => ({ kind, room, position, rotation, size })
 
+/** A piece's width runs along its local x, which the scene turns about the vertical by `rotation`. */
+export function widthAxis({ rotation }: Furniture): Vec2 {
+  const angle = (rotation * Math.PI) / 180
+  return [Math.cos(angle), -Math.sin(angle)]
+}
+
+/** The kinds whose doors can be opened and shut. They begin shut. */
+const withDoors: ReadonlySet<FurnitureKind> = new Set(['closet'])
+export const hasDoors = (item: Furniture) => withDoors.has(item.kind)
+
+/** A piece is known by its kind and where it stands. */
+export type FurnitureId = `${FurnitureKind}@${number},${number}`
+export const furnitureId = ({ kind, position }: Furniture): FurnitureId => `${kind}@${position[0]},${position[1]}`
+
 const SOUTH = 0
 const EAST = 90
 const NORTH = 180

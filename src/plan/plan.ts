@@ -38,21 +38,38 @@ export type Room = {
   ceilingHeight: number | null
 }
 
+export type FittingId =
+  | 'entranceDoor'
+  | 'bedroomDoor'
+  | 'toiletDoor'
+  | 'washroomDoor'
+  | 'slidingWall'
+  | 'hobbyDoor'
+  | 'ldDoor'
+  | 'wicNorthDoor'
+  | 'bathDoor'
+  | 'wicSouthDoor'
+  | 'workroomWindow'
+  | 'ldWindow'
+
 type Span = { offset: number; width: number; height: number }
+/** What makes an opening a fitting, one that can be opened and shut. `open` is how it stands to begin with. */
+type Movable = { id: FittingId; open: boolean }
 
 // `offset` runs from the wall's `from` end. `side` is seen while walking
 // from `from` to `to`.
 export type Opening =
-  | (Span & { kind: 'door'; hinge: End; swingsTo: Side; ajar: number; leaf: 'oak' | 'steel' })
-  | (Span & { kind: 'slidingDoor'; leafSide: Side; slidesTo: End })
-  | (Span & {
-      kind: 'window'
-      sill: number
-      glass: 'clear' | 'frosted'
-      /** Set on a pair of sliding sashes: both shut, or the sash at that end slid open behind the other. */
-      sash?: 'shut' | End
-    })
-  | (Span & { kind: 'slidingWall'; panels: number })
+  /** `ajar` is the angle the leaf stands at when open, in degrees. */
+  | (Span & Movable & { kind: 'door'; hinge: End; swingsTo: Side; ajar: number; leaf: 'oak' | 'steel' })
+  | (Span & Movable & { kind: 'slidingDoor'; leafSide: Side; slidesTo: End })
+  | (Span & Movable & { kind: 'slidingWall'; panels: number })
+  /** A pair of sashes. The one at the `sash` end is the one that slides open, behind the other. */
+  | (Span & Movable & { kind: 'slidingWindow'; sill: number; sash: End })
+  | (Span & { kind: 'window'; sill: number; glass: 'clear' | 'frosted' })
+
+export type Fitting = Extract<Opening, Movable>
+/** Which of the fittings stand open. */
+export type FittingsOpen = Readonly<Record<FittingId, boolean>>
 
 export type Wall = {
   from: Vec2
@@ -97,24 +114,28 @@ export function besideWall(wall: Wall, along: number): [left: Vec2, right: Vec2]
 /** Width of the members of a window's frame, and of the stiles of its sashes. */
 export const WINDOW_FRAME = 0.04
 
-type Window = Extract<Opening, { kind: 'window' }>
+type SlidingWindow = Extract<Opening, { kind: 'slidingWindow' }>
 
 /**
- * A pair of sliding sashes inside the frame: how wide each is, and where
- * each begins, measured from the start of the opening. Shut, they overlap
- * by a stile where they meet.
+ * A pair of sliding sashes inside the frame: how wide each is, where each
+ * begins when shut, measured from the start of the opening, and how far the
+ * one that opens slides to stand behind the other. Shut, they overlap by a
+ * stile where they meet.
  */
-export function sashes({ width, sash }: Window) {
+export function sashes({ width, sash }: SlidingWindow) {
   const each = (width - WINDOW_FRAME) / 2
   const near = WINDOW_FRAME
   const far = width - WINDOW_FRAME - each
-  return { width: each, starts: [sash === 'start' ? far : near, sash === 'end' ? near : far] as const }
+  return {
+    width: each,
+    shut: [near, far] as const,
+    travel: [sash === 'start' ? far - near : 0, sash === 'end' ? near - far : 0] as const,
+  }
 }
 
-/** The stretch of a window that a sash slid open leaves clear inside the frame, as offsets along the wall. */
-export function clearWay(window: Window): [number, number] | null {
+/** The stretch of a window that its sash, slid open, leaves clear inside the frame, as offsets along the wall. */
+export function clearWay(window: SlidingWindow): [number, number] {
   const { offset, width, sash } = window
-  if (sash !== 'start' && sash !== 'end') return null
   const taken = sashes(window).width
   return sash === 'start'
     ? [offset + WINDOW_FRAME, offset + width - WINDOW_FRAME - taken]
@@ -186,14 +207,38 @@ const northWindow = (offset: number): Opening => ({
   glass: 'frosted',
 })
 
-const balconyWindow = (offset: number, width: number, sash: 'shut' | End = 'shut'): Opening => ({
-  kind: 'window',
+const balconyWindow = (id: FittingId, offset: number, width: number, sash: End, open: boolean): Opening => ({
+  kind: 'slidingWindow',
+  id,
+  open,
   offset,
   width,
   height: DOOR,
   sill: 0,
-  glass: 'clear',
   sash,
+})
+
+type Door = Extract<Opening, { kind: 'door' }>
+const door = (
+  id: FittingId,
+  open: boolean,
+  offset: number,
+  width: number,
+  hinge: End,
+  swingsTo: Side,
+  ajar = 80,
+  leaf: Door['leaf'] = 'oak',
+): Opening => ({ kind: 'door', id, open, offset, width, height: DOOR, hinge, swingsTo, ajar, leaf })
+
+const slidingDoor = (id: FittingId, offset: number, width: number, leafSide: Side, slidesTo: End): Opening => ({
+  kind: 'slidingDoor',
+  id,
+  open: true,
+  offset,
+  width,
+  height: DOOR,
+  leafSide,
+  slidesTo,
 })
 
 export const walls: Wall[] = [
@@ -201,16 +246,12 @@ export const walls: Wall[] = [
   wall(
     [0, 0],
     [6, 0],
-    [
-      northWindow(1.1),
-      { kind: 'door', offset: 2.9, width: 0.8, height: DOOR, hinge: 'start', swingsTo: 'left', ajar: 0, leaf: 'steel' },
-      northWindow(4.3),
-    ],
+    [northWindow(1.1), door('entranceDoor', false, 2.9, 0.8, 'start', 'left', 0, 'steel'), northWindow(4.3)],
     OUTER,
   ),
   wall([6, 0], [6, 6.0], [], OUTER),
   wall([6, 6.0], [6, 10.95], [], OUTER, 'concrete'),
-  wall([0, 10.95], [6, 10.95], [balconyWindow(0.4, 2.0), balconyWindow(3.0, 2.6, 'start')], OUTER),
+  wall([0, 10.95], [6, 10.95], [balconyWindow('workroomWindow', 0.4, 2.0, 'start', false), balconyWindow('ldWindow', 3.0, 2.6, 'start', true)], OUTER),
   wall([0, 0], [0, 10.95], [], OUTER),
 
   // The x = 2.67 spine: bedroom, toilet, washroom, then the sliding wall
@@ -219,12 +260,14 @@ export const walls: Wall[] = [
     [2.67, 0],
     [2.67, 10.95],
     [
-      { kind: 'door', offset: 2.7, width: 0.8, height: DOOR, hinge: 'end', swingsTo: 'right', ajar: 80, leaf: 'oak' },
-      { kind: 'door', offset: 3.72, width: 0.62, height: DOOR, hinge: 'start', swingsTo: 'left', ajar: 0, leaf: 'oak' },
-      { kind: 'slidingDoor', offset: 5.9, width: 0.7, height: DOOR, leafSide: 'right', slidesTo: 'end' },
+      door('bedroomDoor', true, 2.7, 0.8, 'end', 'right'),
+      door('toiletDoor', false, 3.72, 0.62, 'start', 'left'),
+      slidingDoor('washroomDoor', 5.9, 0.7, 'right', 'end'),
       // From the face of the closet wall to the inner face of the balcony wall.
       {
         kind: 'slidingWall',
+        id: 'slidingWall',
+        open: false,
         offset: 7.3 + INNER / 2,
         width: 10.95 - OUTER / 2 - (7.3 + INNER / 2),
         height: 2.25,
@@ -236,45 +279,31 @@ export const walls: Wall[] = [
   // Hobby room, with the shoe-cabinet notch taken out of its north-west corner
   wall([4.2, 0], [4.2, 1.1]),
   wall([3.78, 1.1], [4.2, 1.1]),
-  wall(
-    [3.78, 1.1],
-    [3.78, 4.4],
-    [{ kind: 'slidingDoor', offset: 0.4, width: 0.8, height: DOOR, leafSide: 'right', slidesTo: 'end' }],
-  ),
+  wall([3.78, 1.1], [3.78, 4.4], [slidingDoor('hobbyDoor', 0.4, 0.8, 'right', 'end')]),
   wall([3.78, 3.65], [6, 3.65]),
 
   // Door between the corridor and the LDK
-  wall(
-    [2.67, 4.4],
-    [3.78, 4.4],
-    [{ kind: 'door', offset: 0.16, width: 0.8, height: DOOR, hinge: 'end', swingsTo: 'left', ajar: 82, leaf: 'oak' }],
-  ),
+  wall([2.67, 4.4], [3.78, 4.4], [door('ldDoor', true, 0.16, 0.8, 'end', 'left', 82)]),
 
   // Closets and wet rooms on the west side
-  wall(
-    [0, 3.65],
-    [2.67, 3.65],
-    [{ kind: 'slidingDoor', offset: 0.7, width: 0.75, height: DOOR, leafSide: 'right', slidesTo: 'start' }],
-  ),
+  wall([0, 3.65], [2.67, 3.65], [slidingDoor('wicNorthDoor', 0.7, 0.75, 'right', 'start')]),
   wall([0, 4.55], [1.7, 4.55]),
-  wall(
-    [1.7, 3.65],
-    [1.7, 7.3],
-    [{ kind: 'door', offset: 2.1, width: 0.65, height: DOOR, hinge: 'start', swingsTo: 'right', ajar: 0, leaf: 'oak' }],
-  ),
+  wall([1.7, 3.65], [1.7, 7.3], [door('bathDoor', false, 2.1, 0.65, 'start', 'right')]),
   wall([1.7, 4.9], [2.67, 4.9]),
   wall([0, 6.5], [1.7, 6.5]),
-  wall(
-    [0, 7.3],
-    [2.67, 7.3],
-    [{ kind: 'slidingDoor', offset: 0.8, width: 0.75, height: DOOR, leafSide: 'left', slidesTo: 'start' }],
-  ),
+  wall([0, 7.3], [2.67, 7.3], [slidingDoor('wicSouthDoor', 0.8, 0.75, 'left', 'start')]),
 
   // Balcony: glass handrail and the partitions to the neighbours
   wall([0, 12.7], [6, 12.7], [], 0.02, 'glass', 1.1),
   wall([0, 10.95], [0, 12.7], [], 0.05, 'plaster', 1.8),
   wall([6, 10.95], [6, 12.7], [], 0.05, 'plaster', 1.8),
 ]
+
+/** Every fitting, with the wall it is in. */
+export const fittings = walls.flatMap((wall) =>
+  wall.openings.flatMap((opening) => ('id' in opening ? [{ wall, opening }] : [])),
+)
+export type PlacedFitting = (typeof fittings)[number]
 
 // Rects stop at the inner wall faces so their tops never share a plane
 // with a wall of another finish.

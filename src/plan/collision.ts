@@ -2,11 +2,12 @@
 // a circle, and everything it can bump into is a box derived from the same
 // walls, solids and furniture that are drawn.
 
-import { type Furniture, type FurnitureKind, furniture } from './furniture'
+import { type Furniture, type FurnitureKind, furniture, widthAxis } from './furniture'
 import {
   besideWall,
   clearWay,
   floorLevelAt,
+  type FittingsOpen,
   type Opening,
   panelWidth,
   solids,
@@ -28,12 +29,16 @@ export type Box = {
 // Pieces that lie flat on the floor or hang from the ceiling.
 const passable: ReadonlySet<FurnitureKind> = new Set(['rug', 'pendant', 'downlight'])
 
-// The stretch of an opening that can be walked through, as offsets along
-// the wall. A door, or a window with a sash slid open, is a way through
-// only where there is floor on both sides of it, and a window only where
-// that floor comes up to its sill. An open sliding wall is blocked only
-// where its panels are stacked.
-function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] | null {
+/**
+ * The stretch of an opening that can be walked through once it stands
+ * open, as offsets along the wall, or null if it leads nowhere. A door, or
+ * a window with its sash slid open, is a way through only where there is
+ * floor on both sides of it, and a window only where that floor comes up
+ * to its sill. An open sliding wall is blocked only where its panels are
+ * stacked. The leaf of a door swung open is not in the way.
+ */
+export function wayThrough(opening: Opening, wall: Wall): [number, number] | null {
+  if (opening.kind === 'window') return null
   const whole: [number, number] = [opening.offset, opening.offset + opening.width]
   // The floor levels either side of the middle of a stretch, if there is floor on both.
   const floors = ([from, to]: [number, number]) => {
@@ -41,42 +46,49 @@ function gap(opening: Opening, wall: Wall, wallOpen: boolean): [number, number] 
     return left === undefined || right === undefined ? null : [left, right]
   }
   switch (opening.kind) {
-    case 'window': {
+    case 'slidingWindow': {
       const way = clearWay(opening)
-      const levels = way && floors(way)
+      const levels = floors(way)
       return levels && Math.max(...levels) >= opening.sill ? way : null
     }
     case 'slidingWall':
-      return wallOpen ? [opening.offset + panelWidth(opening), whole[1]] : null
+      return [opening.offset + panelWidth(opening), whole[1]]
     case 'door':
     case 'slidingDoor':
       return floors(whole) ? whole : null
   }
 }
 
-function wallBoxes(wall: Wall, wallOpen: boolean): Box[] {
+/** The wall's own thickness over a stretch of it, given as offsets along the wall. */
+function stretch(wall: Wall, [start, end]: readonly [number, number]): Box {
   const axis = wallAxis(wall)
-  const gaps = wall.openings.map((opening) => gap(opening, wall, wallOpen)).filter((found) => found !== null)
-  return spansBetween(gaps, 0, wallLength(wall)).map(([start, end]) => {
-    const middle = (start + end) / 2
-    return {
-      centre: [wall.from[0] + axis[0] * middle, wall.from[1] + axis[1] * middle],
-      axis,
-      half: [(end - start) / 2, wall.thickness / 2],
-    }
-  })
+  const middle = (start + end) / 2
+  return {
+    centre: [wall.from[0] + axis[0] * middle, wall.from[1] + axis[1] * middle],
+    axis,
+    half: [(end - start) / 2, wall.thickness / 2],
+  }
 }
 
-// A piece's width runs along its local x, which the scene turns about the
-// vertical by `rotation`.
-function footprint({ position, rotation, size }: Furniture): Box {
-  const angle = (rotation * Math.PI) / 180
-  return { centre: position, axis: [Math.cos(angle), -Math.sin(angle)], half: [size[0] / 2, size[1] / 2] }
+/** The whole of an opening, which is what a fitting fills when it is shut. */
+export const openingBox = (wall: Wall, opening: Opening) =>
+  stretch(wall, [opening.offset, opening.offset + opening.width])
+
+// A wall is solid except where a fitting that stands open leaves a way through.
+function wallBoxes(wall: Wall, open: FittingsOpen): Box[] {
+  const gaps = wall.openings
+    .map((opening) => (opening.kind !== 'window' && open[opening.id] ? wayThrough(opening, wall) : null))
+    .filter((found) => found !== null)
+  return spansBetween(gaps, 0, wallLength(wall)).map((span) => stretch(wall, span))
 }
 
-export function obstacles({ wallOpen }: { wallOpen: boolean }): Box[] {
+export function footprint(item: Furniture): Box {
+  return { centre: item.position, axis: widthAxis(item), half: [item.size[0] / 2, item.size[1] / 2] }
+}
+
+export function obstacles(open: FittingsOpen): Box[] {
   return [
-    ...walls.flatMap((wall) => wallBoxes(wall, wallOpen)),
+    ...walls.flatMap((wall) => wallBoxes(wall, open)),
     ...solids.map(
       ({ rect }): Box => ({
         centre: [(rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2],
@@ -90,20 +102,56 @@ export function obstacles({ wallOpen }: { wallOpen: boolean }): Box[] {
 
 const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value))
 
+/** A vector in the box's own frame: along its axis, and across it. */
+const inFrame = ({ axis }: Box, [x, y]: Vec2): Vec2 => [x * axis[0] + y * axis[1], y * axis[0] - x * axis[1]]
+
+/** From the nearest point of the box to the point, in the box's frame. Zero inside the box. */
+function offBox(point: Vec2, box: Box): Vec2 {
+  const [along, across] = inFrame(box, [point[0] - box.centre[0], point[1] - box.centre[1]])
+  return [along - clamp(along, box.half[0]), across - clamp(across, box.half[1])]
+}
+
+/** Whether a circle overlaps the box. */
+export const touches = (point: Vec2, radius: number, box: Box) => Math.hypot(...offBox(point, box)) < radius - 1e-9
+
+/**
+ * Where a gaze from `from` along the unit vector `heading` meets the box:
+ * how far off, and through which of the faces that lie along its axis, +1
+ * or -1, or 0 for an end. Null if the gaze misses or begins inside.
+ */
+export function meets(from: Vec2, heading: Vec2, box: Box): { distance: number; face: -1 | 0 | 1 } | null {
+  const origin = inFrame(box, [from[0] - box.centre[0], from[1] - box.centre[1]])
+  const turn = inFrame(box, heading)
+  let enter = -Infinity
+  let leave = Infinity
+  let face: -1 | 0 | 1 = 0
+  for (const i of [0, 1] as const) {
+    if (Math.abs(turn[i]) < 1e-12) {
+      if (Math.abs(origin[i]) > box.half[i]) return null
+      continue
+    }
+    const side = turn[i] > 0 ? -1 : 1
+    const near = (side * box.half[i] - origin[i]) / turn[i]
+    const far = (-side * box.half[i] - origin[i]) / turn[i]
+    if (near > enter) {
+      enter = near
+      face = i === 1 ? side : 0
+    }
+    leave = Math.min(leave, far)
+  }
+  return enter < 0 || enter > leave ? null : { distance: enter, face }
+}
+
 // Moves a circle that overlaps the box out by the shortest way.
-function pushOut(point: Vec2, radius: number, { centre, axis, half }: Box): Vec2 {
-  const dx = point[0] - centre[0]
-  const dy = point[1] - centre[1]
-  const along = dx * axis[0] + dy * axis[1]
-  const across = dy * axis[0] - dx * axis[1]
-  // From the nearest point of the box to the circle's centre, in the box's frame.
-  let offAlong = along - clamp(along, half[0])
-  let offAcross = across - clamp(across, half[1])
+function pushOut(point: Vec2, radius: number, box: Box): Vec2 {
+  const { centre, axis, half } = box
+  let [offAlong, offAcross] = offBox(point, box)
   let distance = Math.hypot(offAlong, offAcross)
   if (distance >= radius - 1e-9) return point
 
   if (distance < 1e-9) {
     // The centre is inside the box: leave through the nearest face.
+    const [along, across] = inFrame(box, [point[0] - centre[0], point[1] - centre[1]])
     const toAlong = half[0] - Math.abs(along)
     const toAcross = half[1] - Math.abs(across)
     offAlong = toAlong < toAcross ? Math.sign(along) || 1 : 0

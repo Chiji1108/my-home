@@ -13,8 +13,10 @@ import {
   Vector3,
 } from 'three'
 import { move, obstacles } from '../plan/collision'
+import { type OperableId, operable } from '../plan/interact'
 import type { Vec2 } from '../plan/plan'
 import { type EyeViewpoint, eyeHeightAt, eyeHeightOf } from '../plan/viewpoints'
+import { inReach } from './reach'
 import { useSceneState } from './SceneState'
 
 const BODY_RADIUS = 0.2
@@ -45,6 +47,10 @@ const keyMoves: Record<string, readonly [strafe: number, forward: number]> = {
 const usesArrows = (target: EventTarget | null) =>
   target instanceof HTMLElement && target.matches('input, select, textarea, [contenteditable]')
 
+// Controls that are typed into, or that a letter picks an option in.
+const takesLetters = (target: EventTarget | null) =>
+  usesArrows(target) && !(target instanceof HTMLInputElement && ['radio', 'checkbox', 'range'].includes(target.type))
+
 const isSeeThrough = (object: Object3D) =>
   object instanceof Mesh && [object.material].flat().every((material: Material) => material.transparent)
 
@@ -58,14 +64,15 @@ const angles = new Euler(0, 0, 0, 'YXZ')
 /**
  * First-person walking. The body is a point on the plan with a heading; the
  * camera follows it, which also carries it in from wherever it was when the
- * walk began. Yaw 0 looks north and grows turning left.
+ * walk began. Yaw 0 looks north and grows turning left. What is within
+ * reach to open or shut is kept up to date, and `onToggle` is asked to do it.
  */
-export function WalkControls({ start }: { start: EyeViewpoint }) {
+export function WalkControls({ start, onToggle }: { start: EyeViewpoint; onToggle: (id: OperableId) => void }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera
   const scene = useThree((state) => state.scene)
   const canvas = useThree((state) => state.gl.domElement)
-  const { wallOpen } = useSceneState()
-  const boxes = useMemo(() => obstacles({ wallOpen }), [wallOpen])
+  const { open } = useSceneState()
+  const boxes = useMemo(() => obstacles(open), [open])
 
   const [body] = useState(() => {
     const dx = start.lookAt[0] - start.position[0]
@@ -129,7 +136,13 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     const release = () => body.keys.clear()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Meta') return release()
-      if (!(event.code in keyMoves) || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.code === 'KeyE') {
+        const within = inReach.get()
+        if (within && !event.repeat && !takesLetters(event.target)) onToggle(within)
+        return
+      }
+      if (!(event.code in keyMoves)) return
       if (event.code.startsWith('Arrow')) {
         if (usesArrows(event.target)) return
         // Keeps the arrow keys from scrolling the row of viewpoints.
@@ -152,7 +165,10 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     window.addEventListener('keyup', onKeyUp, { signal })
     window.addEventListener('blur', release, { signal })
     return () => listening.abort()
-  }, [body, camera, scene, canvas])
+  }, [body, camera, scene, canvas, onToggle])
+
+  // The walk ends with nothing within reach.
+  useEffect(() => () => inReach.set(null), [])
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1)
@@ -187,6 +203,9 @@ export function WalkControls({ start }: { start: EyeViewpoint }) {
     // There is no route finding: a goal that the body can no longer close in on is dropped.
     if (body.goal && Math.hypot(next[0] - x, next[1] - y) < reach * 0.2) body.goal = null
     body.position = next
+
+    const heading: Vec2 = [-Math.sin(body.yaw), -Math.cos(body.yaw)]
+    inReach.set(operable(next, heading, BODY_RADIUS, open, boxes))
 
     const ease = 1 - Math.exp(-EASE * dt)
     body.eye = eyeHeightAt(next) ?? body.eye
