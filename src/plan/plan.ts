@@ -246,7 +246,7 @@ export const walls: Wall[] = [
   wall(
     [0, 0],
     [6, 0],
-    [northWindow(1.1), door('entranceDoor', false, 2.9, 0.8, 'start', 'left', 80, 'steel'), northWindow(4.3)],
+    [northWindow(1.1), door('entranceDoor', false, 2.9, 0.8, 'start', 'left', 0, 'steel'), northWindow(4.3)],
     OUTER,
   ),
   wall([6, 0], [6, 6.0], [], OUTER),

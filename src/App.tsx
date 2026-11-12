@@ -16,8 +16,6 @@ export function App() {
   const [shot, setShot] = useState<{ view: Viewpoint; walking: boolean }>({ view: viewpoints[0], walking: false })
   const [night, setNight] = useState(false)
   const [open, setOpen] = useState(initiallyOpen)
-  /** What the walk has within reach to open or shut. */
-  const [target, setTarget] = useState<OperableId | null>(null)
   const { view, walking } = shot
   const toggle = useCallback((id: OperableId) => setOpen((open): OpenState => ({ ...open, [id]: !open[id] })), [])
 
@@ -33,7 +31,7 @@ export function App() {
           <Shell />
           <FurnitureLayer />
           <Lighting />
-          {walking && <WalkControls start={walkStart(view)} onTarget={setTarget} onToggle={toggle} />}
+          {walking && <WalkControls start={walkStart(view)} onToggle={toggle} />}
         </SceneStateProvider>
         {!walking && <CameraRig shot={shot} />}
       </Canvas>
@@ -45,8 +43,7 @@ export function App() {
         night={night}
         onNight={setNight}
         open={open}
-        onOpen={(id, to) => setOpen({ ...open, [id]: to })}
-        target={target}
+        onOpen={(id, to) => setOpen((open): OpenState => ({ ...open, [id]: to }))}
         onToggle={toggle}
       />
     </>

@@ -1,4 +1,5 @@
 import type { OpenState, OperableId } from '../plan/interact'
+import { useInReach } from '../scene/reach'
 import { type Viewpoint, viewpoints } from '../plan/viewpoints'
 
 type Props = {
@@ -10,8 +11,6 @@ type Props = {
   onNight: (night: boolean) => void
   open: OpenState
   onOpen: (id: OperableId, open: boolean) => void
-  /** What the walk has within reach to open or shut. */
-  target: OperableId | null
   onToggle: (id: OperableId) => void
 }
 
@@ -44,7 +43,8 @@ function Toggle<T extends string>({
   )
 }
 
-export function Overlay({ view, onView, walking, onWalk, night, onNight, open, onOpen, target, onToggle }: Props) {
+export function Overlay({ view, onView, walking, onWalk, night, onNight, open, onOpen, onToggle }: Props) {
+  const target = useInReach()
   return (
     <div className="overlay" data-night={night}>
       {target && (
