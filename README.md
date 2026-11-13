@@ -4,7 +4,12 @@
 
 **https://home.chiji.tech**
 
-![俯瞰](public/og.png)
+[![My Home](public/og.png)](https://home.chiji.tech)
+
+| | |
+|---|---|
+| ![昼の LD](docs/ld.jpg) | ![夜の LD](docs/ld-night.jpg) |
+| ![ダイニングとキッチン](docs/dining.jpg) | ![仕事部屋](docs/work.jpg) |
 
 ## 操作
 
