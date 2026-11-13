@@ -103,13 +103,9 @@ export function Lighting() {
         {/*
           Eight samples, half the pass's default; indoors the pass is most of the frame. Its radius is a
           metre of the room, and a sample that lands off the screen is dropped: 0.2 m from a face, as
-          near as the walk gets, four in five are, which leaves 1.5 to a pixel against 7 from the middle
-          of a room. That is the black grain seen up close, and it is left to the blur to take out. The
-          blur keeps its sixteen taps but takes them as four passes of four over twice the radius, in
-          place of two of eight. Measured at 0.2 m from a door (2386x1692, the luminance less its 7 px
-          mean, rms out of 255): the grain goes from 4.0 to 1.2, under the 1.8 to 2.5 a room had from
-          its middle, and the blotches the blur leaves behind from 2.4 to 0.8. A room from its middle
-          changes by under 1 in 255, and a frame costs 0.1 to 0.4 ms more of 6 to 8 (Metal).
+          near as the walk gets, four in five are. What is left is the black grain seen up close, and
+          two passes of the blur do not take it out; four do, at the same radius, so that a room from
+          its middle looks as it did.
         */}
         <N8AO
           ref={blurPasses}
@@ -117,8 +113,8 @@ export function Lighting() {
           distanceFalloff={1}
           intensity={3}
           aoSamples={8}
-          denoiseSamples={4}
-          denoiseRadius={24}
+          denoiseSamples={8}
+          denoiseRadius={12}
         />
         <Bloom mipmapBlur luminanceThreshold={3} intensity={0.5} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
