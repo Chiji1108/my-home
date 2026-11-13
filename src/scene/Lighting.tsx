@@ -82,6 +82,11 @@ function Sky({ night }: { night: boolean }) {
   )
 }
 
+/** The pass blurs its occlusion twice unless told otherwise, and the component has no prop for it. */
+function blurPasses(pass: { configuration: { denoiseIterations: number } } | null) {
+  if (pass) pass.configuration.denoiseIterations = 4
+}
+
 export function Lighting() {
   const { night } = useSceneState()
   const shadowsDirty = useShadowsDirty()
@@ -96,11 +101,14 @@ export function Lighting() {
       {!night && <Sun />}
       <EffectComposer multisampling={4}>
         {/*
-          Eight samples, half the pass's default; indoors the pass is most of the frame. Measured against
-          sixteen: fewer than one pixel in two hundred differs by more than 8 in 255, and as the camera
-          turns the picture changes from frame to frame by 2% more. The noise is fixed to the screen.
+          Eight samples, half the pass's default; indoors the pass is most of the frame. Its radius is a
+          metre of the room, and a sample that lands off the screen is dropped: 0.2 m from a face, as
+          near as the walk gets, four in five are. What is left is the black grain seen up close, and
+          two passes of the blur do not take it out; four do, at the same radius, so that a room from
+          its middle looks as it did.
         */}
         <N8AO
+          ref={blurPasses}
           aoRadius={1}
           distanceFalloff={1}
           intensity={3}
